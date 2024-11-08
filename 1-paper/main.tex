@@ -1,0 +1,151 @@
+% !TEX TS-program = pdflatexmk
+\documentclass[letterpaper,12pt]{article}
+\synctex=1
+\usepackage{makeidx}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage[onehalfspacing]{setspace}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage[utf8]{inputenc}
+\usepackage{gensymb}
+\usepackage[T1]{fontenc}
+\usepackage{lscape}
+\usepackage{rotating}
+\usepackage[hypertexnames=false,breaklinks=false,final,pdftoolbar=true,pagebackref=true,pdfborder={0 0 0},bookmarks=true,bookmarksnumbered=true,linkbordercolor={1 0 0},backref=false,breaklinks]{hyperref}
+\usepackage{soul}
+\usepackage[toc,page,header]{appendix}
+\usepackage{minitoc}
+\usepackage{xcolor}
+
+\newcommand{\about}{\mathord{\sim}}
+\renewcommand{\vec}[1]{\mathbf{#1}}
+\newcommand\norm[1]{\left\lVert#1\right\rVert}
+
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+
+\setcounter{MaxMatrixCols}{10}
+
+
+\usepackage[margin=1in]{geometry}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{acknowledgement}[theorem]{Acknowledgement}
+\newtheorem{algorithm}[theorem]{Algorithm}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{case}[theorem]{Case}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{condition}[theorem]{Condition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{criterion}[theorem]{Criterion}
+\newtheorem{definition}{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{exercise}[theorem]{Exercise}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{problem}[theorem]{Problem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{solution}[theorem]{Solution}
+\newtheorem{summary}[theorem]{Summary}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\textfraction}{0.01}
+\renewcommand{\floatpagefraction}{0.9}
+
+\usepackage[nomessages]{fp}
+\usepackage{subfig}
+\newcounter{panel}[table]
+\renewcommand{\thepanel}{\Alph{panel}}
+\newcommand{\mypanel}[1][]{{\refstepcounter{panel}Panel \thepanel: \ #1}}
+\newcounter{mycols}
+\newcommand{\set}[1]{\left\{#1\right\}}
+
+\DeclareGraphicsExtensions{.png,.pdf,.jpg}
+
+\renewcommand\thepart{ }
+\renewcommand\partname{}
+\addto{\captionsenglish}{ \renewcommand{\partname}{}
+}
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{2}
+\setcounter{secttocdepth}{2}
+
+% Packages
+\usepackage{xr-hyper} % For cross-referencing with hyperlinks
+
+% External document reference (linking to appendix)
+\externaldocument{../2-appendix/appendix} % Adjust path if needed
+
+
+%\input{tcilatex}
+\begin{document}
+\selectlanguage{english}
+
+\begin{titlepage}
+
+\title{\vspace{-.2cm}\thanks{Özak: Department of Economics, Southern Methodist University, IZA and GLO, \href{mailto:ozak@smu.edu}{ozak@smu.edu}, ORCID 0000-0001-6421-2801. This work used resources of the O'Donnell Data Science and Research Computing Institute at the Southern Methodist University.}} 
+\author{\ \ \ \ Ömer Özak \ \ \ \ \  \\
+\textit{SMU, IZA}, and \textit{GLO}}
+
+\date{August 2024}
+\maketitle
+\thispagestyle{empty}
+
+\vspace{-0.93cm}
+\begin{abstract}
+\noindent 
+\vspace{.2cm} \\
+\noindent \textit{Keywords: } \\
+\noindent {\em JEL Codes}: 
+\end{abstract}
+\end{titlepage}
+
+
+\doparttoc 
+\faketableofcontents 
+
+\section{Introduction}
+
+\bibliographystyle{dcu}
+
+\bibliography{main}
+
+
+%ONLINE APPENDIX
+\clearpage
+\part{\centerline{\LARGE{Online Appendix}}}
+%\textcolor{blue}{\LARGE{\centerline{\href{}{Available for download here}}}}
+
+\clearpage
+
+\centerline{\Large\bf TITLE}  \vskip5pt \centerline{\Large\bf MORE TITLE} \vskip5pt \centerline{\large by} \centerline{\large \bf Ömer Özak} \vskip10pt \centerline{\Large \bf Online Appendix} % Start the appendix part
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{2}
+\setcounter{parttocdepth}{2}
+\setcounter{secttocdepth}{2}
+\parttoc % Insert the appendix TOC
+\singlespacing
+\appendix
+\setcounter{section}{0}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\renewcommand*{\thesection}{\Alph{section}}
+\renewcommand*\thesubsection{\Alph{section}.\arabic{subsection}}
+
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+
+\clearpage
+
+\section{APPENDIX 1\label{sec-app}}
+
+
+\end{document}
