@@ -7,4 +7,5 @@ These files help the creation of replication packages. Can be used as project fo
 
 &copy; Ömer Özak (2024)
 
-This code and data is provided under [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License](https://creativecommons.org/licenses/by-sa/4.0/). ![](http://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg)
+This code and data is provided under [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License](https://creativecommons.org/licenses/by-sa/4.0/) and [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html).
+![](http://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg) ![](https://www.gnu.org/graphics/gplv3-127x51.png)
