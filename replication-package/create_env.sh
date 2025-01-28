@@ -67,4 +67,4 @@ fi
 mamba run -n $ENV_NAME python -m ipykernel install --user --name=conda-env-$ENV_NAME-py
 
 # Activate the environment
-echo 'To activate this environment, use: mamba activate $ENV_NAME'
+echo 'To activate this environment, use: mamba activate' $ENV_NAME

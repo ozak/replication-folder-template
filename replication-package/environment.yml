@@ -28,6 +28,7 @@ dependencies:
   - geopy
   - pycountry
   - nb_conda_kernels
+  - nbconvert
   - stata_kernel
   - plotly
   - nodejs
@@ -66,3 +67,5 @@ dependencies:
       - rdrobust 
       - lets-plot
       - jupyterlab_stata_highlight3
+      - dask-labextension
+      - hmi
