@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/885538310.svg)](https://doi.org/10.5281/zenodo.14758676)
+
 # Replication Folder Template
 ---
 
