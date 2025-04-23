@@ -69,3 +69,4 @@ dependencies:
       - jupyterlab_stata_highlight3
       - dask-labextension
       - hmi
+      - stata_setup==0.1.3
