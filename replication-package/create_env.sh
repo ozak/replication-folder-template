@@ -48,12 +48,18 @@ if [ "$OS" == "Linux" ]; then
 
 fi
 
-# MACOS: Assumes you have bew installed
+# MACOS: Assumes you have brew installed
 if [ "$OS" == "Darwin" ]; then
-    # macOS-specific commands
     echo "This is macOS"
-    # macOS-specific commands
-    brew install fribidi automake autoconf
+
+    for pkg in fribidi automake autoconf; do
+        if ! brew list --formula | grep -q "^$pkg\$"; then
+            echo "Installing $pkg..."
+            brew install "$pkg"
+        else
+            echo "$pkg is already installed"
+        fi
+    done
 fi
 
 # Initialize an renv project
