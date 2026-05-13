@@ -1,4 +1,4 @@
-name: awsome-project
+name: awesome-project
 channels:
   - conda-forge
   - defaults

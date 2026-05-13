@@ -13,7 +13,7 @@ contributors:
 
 # Replication Repository
 
-This repository contains the data and code to replicate the analyses performed in ["AWSOME PAPER]() by [Ömer Özak](http://omerozak.com).   If you use the code or data in this repository, please cite both the original paper and the dataset.
+This repository contains the data and code to replicate the analyses performed in ["AWESOME PAPER"]() by [Ömer Özak](http://omerozak.com).   If you use the code or data in this repository, please cite both the original paper and the dataset.
 
 Suggested citation:
 

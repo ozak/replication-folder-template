@@ -4,7 +4,7 @@ library(renv)
 # Initialize renv
 renv::init(bare = TRUE)
 
-# Install dependiencies and packages
+# Install dependencies and packages
 renv::install(c("broom", "easypackages", "fixest", "furrr", "future", "gridExtra", "haven"))
 renv::install(c("tidyverse", "data.table", "ggplot2", "binsreg", "essentials", "dplyr", "remotes", "easypackages", "languageserver"))
 renv::install("devtools")
