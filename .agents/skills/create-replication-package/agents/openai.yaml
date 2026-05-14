@@ -1,0 +1,7 @@
+interface:
+  display_name: "Create Replication Package"
+  short_description: "Build a journal-ready replication package"
+  default_prompt: "Use $create-replication-package to turn this research project into a journal-ready replication package."
+
+policy:
+  allow_implicit_invocation: true
