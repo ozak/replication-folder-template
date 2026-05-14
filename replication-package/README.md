@@ -1,6 +1,6 @@
 ---
 contributors:
-  - [Ömer Özak](http://omerozak.com)
+  - [{{author_name}}]({{author_website}})
 
 ---
 
@@ -8,24 +8,24 @@ contributors:
     <h1><strong>TITLE</strong></h1>
     <h1><strong>FURTHER TITLE</strong></h1>
     <h1>by</h1>
-    <h1><strong><a href="http://omerozak.com">Ömer Özak</a></strong></h1>
+    <h1><strong><a href="{{author_website}}">{{author_name}}</a></strong></h1>
 </div>
 
 # Replication Repository
 
-This repository contains the data and code to replicate the analyses performed in ["AWESOME PAPER"]() by [Ömer Özak](http://omerozak.com).   If you use the code or data in this repository, please cite both the original paper and the dataset.
+This repository contains the data and code to replicate the analyses performed in ["AWESOME PAPER"]() by [{{author_name}}]({{author_website}}).   If you use the code or data in this repository, please cite both the original paper and the dataset.
 
 Suggested citation:
 
 ```cite
-Özak, Ömer. (20XX) "AWESOME PAPER (Replication Package)"
+{{author_last_name}}, {{author_name}}. (20XX) "AWESOME PAPER (Replication Package)"
 ```
 
 ## Overview
 
 We have created a set of notebooks to help you replicate our analysis. All computations are explained and executed from the [main Jupyter notebook `index.ipynb`](./index.ipynb) ([HTML output](./index.html)).
 
-Most analyses and replication steps should run on a personal computer, provided there is enough memory available—the code was tested on a MacBook Pro with 64 GB RAM. Sections or steps highlighted in <span style="color: red;">red</span> can be run on a personal laptop or desktop but may take too much time to be feasibly reproduced there.
+Most analyses and replication steps should run on a personal computer, provided there is enough memory available—the code was tested on a computer with {{laptop_memory}}. Sections or steps highlighted in <span style="color: red;">red</span> can be run on a personal laptop or desktop but may take too much time to be feasibly reproduced there.
 
 If desired, you can use a cluster or supercomputer to exploit embarrassingly parallel processing using the code we provide. Alternatively, to avoid the need of additional computing resources, we have provided tests to confirm that the data we have created and shared is identical to that generated using the code and data we provide for each step.
 
@@ -327,9 +327,9 @@ Approximate storage space needed:
 
 #### Details
 
-The code was last run on a **Macbook Pro laptop with M3 Max Chipset, 64GB RAM, MacOS version 14.6.1 with 1TB of free space**. 
+The code was last run on a **{{laptop_specs}}**. 
 
-Portions of the code were last run on SMU's M3 cluster using the `standard-s` and `standard-l` queues, which provide access to a **AMD EPYC 7763 64-Core Processor server with 128-cores, 512 GB of RAM, 12 TB of fast local storage running Linux Ubuntu 22.04.4 LTS**. Computation took about **500K computing hours (~10 actual days)**. 
+Portions of the code were last run on {{cluster_specs}}. Computation took about **{{compute_hours}}**. 
 
 
 ## Description of programs/code
@@ -412,5 +412,5 @@ The provided code reproduces:
 
 This data and code is provided under [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License](https://creativecommons.org/licenses/by-sa/4.0/). ![](http://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg)
 
-[<img src="https://github.com/measuring-culture/Expanding-Measurement-Culture-Facebook-JRSI/blob/e3698e2166d224a251a3123886cc7831b85a87b9/pics/SMUlogowWordmarkRB.jpg?raw=true" width="250">](http://omerozak.com)
+[<img src="{{institution_logo_url}}" width="{{institution_logo_width}}">]({{institution_logo_link}})
 [<img src="https://github.com/measuring-culture/Expanding-Measurement-Culture-Facebook-JRSI/blob/e3698e2166d224a251a3123886cc7831b85a87b9/pics/UC3M.png?raw=true" width="200">]()

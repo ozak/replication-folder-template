@@ -46,6 +46,12 @@ If the target folder already exists or `git clone` fails (e.g., no internet), fa
 cp -r "$(find ~ -maxdepth 6 -name replication-folder-template -type d 2>/dev/null | head -1)" "<target-folder>"
 ```
 
+**Apply author defaults** — the template uses `{{placeholder}}` tokens for author info and compute specs. Fill them in immediately using the bundled script, which auto-detects `.replication_defaults.yml` walking up from the target folder:
+```bash
+python scripts/apply_defaults.py "<target-folder>"
+```
+If no defaults file is found, the script prints the unfilled tokens and exits with an error. In that case, ask the user to copy `.replication_defaults.yml.example` to `.replication_defaults.yml` and fill in their details, then re-run. Once applied, every file under the target folder will have real author names, email, compute specs, etc.
+
 **Immediately clean up template artifacts** — these don't belong in a paper-specific package:
 ```bash
 cd "<target-folder>"

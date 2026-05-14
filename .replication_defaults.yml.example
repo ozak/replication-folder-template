@@ -1,0 +1,23 @@
+# Copy this file to .replication_defaults.yml and fill in your details.
+# .replication_defaults.yml is gitignored — your personal info stays local.
+# The create-replication-package skill reads this file to auto-fill author
+# info and compute specs into every new replication package.
+
+author_name: "YOUR FULL NAME"
+author_last_name: "LAST_NAME"
+author_website: "https://yourwebsite.com"
+author_email: "you@institution.edu"
+author_orcid: "0000-0000-0000-0000"
+author_affiliation: "Department of X, University of Y, NETWORK1 and NETWORK2"
+author_affiliation_short: "UNIV, NETWORK1"
+author_affiliation_extra: "NETWORK2"
+author_grants: "Acknowledgement of compute resources or grants."
+
+laptop_specs: "Laptop with X CPU, Y GB RAM, OS version Z with W TB of free space"
+laptop_memory: "Y GB RAM"
+cluster_specs: "INSTITUTION cluster using the `queue-1` and `queue-2` queues, which provide access to a **CPU server with N-cores, M GB of RAM, K TB of fast local storage running OS**"
+compute_hours: "XXX computing hours (~Y actual days)"
+
+institution_logo_url: "https://path/to/institution-logo.png"
+institution_logo_width: "200"
+institution_logo_link: "https://yourwebsite.com"
