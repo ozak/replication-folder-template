@@ -19,7 +19,7 @@ replication-folder-template/
 │   ├── create_env.sh     # One-step environment creation script
 │   ├── setup.do          # Stata package installer (run once in Stata)
 │   ├── progs/Python/     # Python Jupyter notebooks
-│   └── progs/Stata/      # Stata Jupyter notebooks (stata_kernel)
+│   └── progs/Stata/      # Stata notebooks (pystata: python3 kernel, `import stata_init`, %%stata cells)
 └── replication-zip.ipynb # Creates distributable zip files for submission
 ```
 
@@ -76,13 +76,13 @@ jupyter nbconvert "NotebookName.ipynb" --to notebook \
 ```bash
 cd replication-package/progs/Stata
 jupyter nbconvert "NotebookName.ipynb" --to notebook \
-  --execute --ExecutePreprocessor.kernel_name=stata \
+  --execute --ExecutePreprocessor.kernel_name=python3 \
   --output "NotebookName.ipynb"
 ```
 
 **Execute a Stata `.do` file and capture log:**
 ```bash
-stata-mp -b do replication-package/progs/Stata/script.do
+cd replication-package/progs/Stata && stata-mp -b do script.do
 ```
 
 ## Creating the Replication Zip

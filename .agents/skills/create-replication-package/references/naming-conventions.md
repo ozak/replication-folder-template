@@ -1,65 +1,94 @@
 # Figure and Table Naming Conventions
 
-## Standard convention
+Final files are named by **what LaTeX prints**, hyphen-separated. `parse_latex.py` applies these
+rules; this page explains them so you can review its proposals with the user.
 
-Files are named by order of appearance in the paper, with a **hyphen** before panel letters:
+## Main text
 
-| Type | Convention | Example |
+| What LaTeX shows | File name | Notes |
 |---|---|---|
-| Main figure | `Figure-N.ext` | `Figure-1.pdf` |
-| Main figure with panels | `Figure-N-a.ext`, `Figure-N-b.ext` | `Figure-2-a.jpg`, `Figure-2-b.jpg` |
-| Main table | `Table-N.tex` | `Table-1.tex` |
-| Multi-panel table | `Table-N-PanelA.tex`, `Table-N-PanelB.tex` | `Table-2-PanelA.tex` |
+| Figure 3 | `Figure-3.pdf` | one graphic in the float |
+| Figure 6(a), 6(b) | `Figure-6-a.pdf`, `Figure-6-b.pdf` | several graphics, or `\subfloat`/`\subfigure` panels |
+| Figure 1 with a full-width map plus two panels | `Figure-1.jpg`, `Figure-1-a.jpg`, `Figure-1-b.jpg` | the graphic inside `\multicolumn` is the *overview* and keeps the bare name |
+| Table 1 | `Table-1.tex` | one `\input` (or one top-level `\input` of a file holding the whole `table` float) |
+| Table 2, Panels A–C | `Table-2-Panel-A.tex`, `Table-2-Panel-B.tex`, `Table-2-Panel-C.tex` | several `\input`s inside one table float |
 
-## Appendix naming
+## Appendix
 
-Appendix figures and tables use the **appendix section letter** as a prefix, followed by the figure/table number within that section:
+The appendix **section letter is fused with the number**, exactly like LaTeX prints it
+(`\counterwithin{figure}{section}` → "Figure D1"):
 
-| Type | Convention | Example |
-|---|---|---|
-| Appendix D figure | `Figure-D-N.ext` | `Figure-D-1.pdf` |
-| Appendix D figure with panels | `Figure-D-N-a.ext` | `Figure-D-1-a.jpg` |
-| Appendix D table | `Table-D-N.tex` | `Table-D-1.tex` |
-| Appendix E figure | `Figure-E-N.ext` | `Figure-E-1.pdf` |
-| Appendix E table | `Table-E-N.tex` | `Table-E-1.tex` |
+| What LaTeX shows | File name |
+|---|---|
+| Figure C1(a) … C1(d) | `Figure-C1-a.pdf` … `Figure-C1-d.pdf` |
+| Table D1 | `Table-D1.tex` |
+| Table E2, Panel A | `Table-E2-Panel-A.tex` |
+| Table D6 continued, continued again | `Table-D6-cont.tex`, `Table-D6-cont2.tex` |
 
-If there is only a single appendix section (no named subsections), use `A` as the letter:
-- `Figure-A-1.pdf`, `Table-A-1.tex`
+Letters: after `\appendix`, each **unstarred** `\section` advances the letter (A, B, C, …).
+Starred sections (`\section*{Online Appendix}`) do not. Sections without floats still consume a
+letter (CountryStability: A = Endogenous Identity Choice, B = Data Sources, C = Language and
+Religion → first figure is `Figure-C1-a`). If the appendix document restarts or offsets the
+letters, pass `--appendix-first-letter`.
 
-The letter corresponds to the `\section{Appendix D}` or `\appendix` section label in the LaTeX source.
+## Grids of panels
 
-## "Overview + panels" pattern
+A figure laid out as a grid of plain graphics (rows × columns in a `tabular`, or one
+`\subfigure` per row each holding a row of graphics) is named **column letter + row number**:
 
-Some figures have both a combined overview image and individual panel images:
-- `Figure-1.jpg` — the combined overview
-- `Figure-1-a.jpg`, `Figure-1-b.jpg` — individual panels
+```
+Figure-B1-a1  Figure-B1-b1  Figure-B1-c1
+Figure-B1-a2  Figure-B1-b2  Figure-B1-c2
+Figure-B1-a3  Figure-B1-b3  Figure-B1-c3
+```
 
-This occurs when the figure environment contains both a full `\includegraphics` and subfigure panels. Both the overview and the panels get names under the same figure number.
+(OriginLanguages, Appendix B: 3 linguistic traits × 3 specifications.)
 
-## How to determine numbering from LaTeX
+## Continued floats
 
-Walk the `.tex` file linearly:
-1. Each `\begin{figure}` or `\begin{figure*}` increments the figure counter
-2. Multiple `\includegraphics` within one `\begin{figure}` → panels (a, b, c…)
-3. Each `\begin{table}` increments the table counter
-4. `\appendix` or a named `\section{Appendix X}` resets numbering to the section letter
-5. A file referenced multiple times → keep the name from first occurrence
+* Tables continued with `\ContinuedFloat` or `\addtocounter{table}{-1}` → `-cont`, `-cont2`, …
+* Figures continued the same way keep their number and **continue the panel letters**:
+  `Figure-I4-a … Figure-I4-e` on the first page, `Figure-I4-f … Figure-I4-j` on the continuation;
+  `Figure-F1-a`, `Figure-F1-b`, then `Figure-F1-c` alone on the next page.
 
-## Extension handling
+## Extensions and formats
 
-Match the source file's extension. Don't convert formats.
+* Keep the source extension; never convert formats.
+* If the `.tex` omits the extension and several formats exist (`Figure-2.pdf` and `Figure-2.jpg`),
+  copy all of them — LaTeX picks one, journals sometimes ask for the other.
+* If a file is referenced twice, the first name wins (`duplicate` status).
+* No spaces in any name in the package: whitespace becomes `-` (runs collapse to one), for
+  folders, code, data and outputs alike (`GDP data.csv` → `GDP-data.csv`, `World Bank/` →
+  `World-Bank/`). Log each rename and update every reference in code, `.tex` and `index.ipynb`.
 
-Common: `.pdf` (vector), `.jpg` (raster color), `.png` (raster with transparency), `.eps` (legacy)
+## Where the files go
 
-## Continuation files
+| Folder | Contents |
+|---|---|
+| `replication-package/graphs/paper/`, `tables/paper/` | numbered (main-text) figures and tables |
+| `replication-package/graphs/appendix/`, `tables/appendix/` | lettered (appendix) figures and tables |
+| `1-paper/graphs/…`, `1-paper/tables/…` | copies of what the main `.tex` references |
+| `2-appendix/graphs/…`, `2-appendix/tables/…` | copies of what the appendix `.tex` references |
 
-Long tables split across files use a `-cont` suffix:
-- `Table-D-6.tex`, `Table-D-6-cont.tex`, `Table-D-6-cont2.tex`
+The path written in the `.tex` (`./graphs/paper/Figure-1-a`, `./tables/appendix/Table-D3`) is the
+same relative path inside `replication-package/`, `1-paper/` and `2-appendix/`. `Copy-Final.ipynb`
+reads the `.tex` files and copies exactly what they reference, so appendix items that appear in the
+main text (e.g. an EJ "Appendix A" inside the main paper) are handled automatically.
 
-## Where files go
+## What a table file contains
 
-All final output files (both main paper AND appendix) go into:
-- `replication-package/graphs/paper/` — all figures
-- `replication-package/tables/paper/` — all tables
+For tables whose body was pasted in the paper, `Table-N.tex` holds **only the body rows** (between
+the header `\midrule` and `\bottomrule`); caption, column headers and notes stay in the paper's
+`.tex`, which `\input`s the file inside its `tabular`. Multi-panel tables get one body file per panel
+(`Table-N-Panel-A.tex`), with panel header rows kept in the `.tex`. The same applies when the paper
+`\input`/`\include`d a complete (often hand-edited) table file: its head and foot are moved into the
+paper and `Table-N.tex` becomes body-only.
 
-The `1-paper/graphs/paper/` and `2-appendix/graphs/paper/` directories contain **copies** of the relevant subset, needed for LaTeX compilation of each document separately.
+## Things to confirm with the user
+
+* Panel order when graphics are not in reading order in the source.
+* Images that are not analysis outputs (photographs, scanned maps): they still get standard
+  names (`Figure-H2.png`), are copied from `raw-data/` or `graphs/`, and their source/licence goes
+  in the README.
+* Inconsistent names in an earlier package (OriginLanguages used `Figure-H3` + `Figure-H3b`;
+  the convention gives `Figure-H3-a`, `Figure-H3-b`).

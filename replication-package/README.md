@@ -1,24 +1,24 @@
 ---
 contributors:
-  - [{{author_name}}]({{author_website}})
+{{authors_md_list}}
 
 ---
 
 <div style="line-height: 1.1;">
-    <h1><strong>TITLE</strong></h1>
-    <h1><strong>FURTHER TITLE</strong></h1>
+    <h1><strong>{{title}}</strong></h1>
+    <h1><strong>{{subtitle}}</strong></h1>
     <h1>by</h1>
-    <h1><strong><a href="{{author_website}}">{{author_name}}</a></strong></h1>
+    <h1><strong>{{authors_html}}</strong></h1>
 </div>
 
 # Replication Repository
 
-This repository contains the data and code to replicate the analyses performed in ["AWESOME PAPER"]() by [{{author_name}}]({{author_website}}).   If you use the code or data in this repository, please cite both the original paper and the dataset.
+This repository contains the data and code to replicate the analyses performed in "{{title}}" by {{authors_md}}.   If you use the code or data in this repository, please cite both the original paper and the dataset.
 
 Suggested citation:
 
 ```cite
-{{author_last_name}}, {{author_name}}. (20XX) "AWESOME PAPER (Replication Package)"
+{{authors_citation}}. ({{year}}) "{{title}} (Replication Package)"
 ```
 
 ## Overview
@@ -412,5 +412,4 @@ The provided code reproduces:
 
 This data and code is provided under [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0) License](https://creativecommons.org/licenses/by-sa/4.0/). ![](http://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg)
 
-[<img src="{{institution_logo_url}}" width="{{institution_logo_width}}">]({{institution_logo_link}})
-[<img src="https://github.com/measuring-culture/Expanding-Measurement-Culture-Facebook-JRSI/blob/e3698e2166d224a251a3123886cc7831b85a87b9/pics/UC3M.png?raw=true" width="200">]()
+{{logos_md}}

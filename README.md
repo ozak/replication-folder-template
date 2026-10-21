@@ -2,22 +2,48 @@
 
 # Replication Folder Template
 
-A standardized folder structure, environment setup, and AI-assisted workflow for turning research projects into journal-ready replication packages. It ships with a **Claude Code skill** and a **Codex (ChatGPT) agent** that automate most of the conversion work.
+A standardized folder structure, environment setup, and AI-assisted workflow for turning research projects into journal-ready replication packages. It ships with a **Claude skill** (`create-replication-package`) and a **Codex (ChatGPT) agent** that do most of the conversion work: they find the code that actually produces your paper, migrate it into notebooks, standardize figure and table names, rewrite the LaTeX, build `index.ipynb`, the README and the submission zips, and check that every number in your tables is reproduced.
 
-Based on the [replication package](https://doi.org/10.5281/zenodo.14048457) for ["Is Secessionism Mostly About Income or Identity? A Global Analysis of 3,153 Subnational Regions"](https://doi.org/10.1093/ej/ueae110).
+Based on the replication packages for ["Is Secessionism Mostly About Income or Identity? A Global Analysis of 3,153 Subnational Regions"](https://doi.org/10.1093/ej/ueae110) ([Zenodo](https://doi.org/10.5281/zenodo.14048457)) and "Roots of Cultural and Linguistic Traits".
 
 ---
 
 ## Table of Contents
 
-1. [Repository Layout](#repository-layout)
-2. [Use Case 1: Start a New Project from Scratch](#use-case-1-start-a-new-project-from-scratch)
-3. [Use Case 2: Convert an Existing Project with Claude Code](#use-case-2-convert-an-existing-project-with-claude-code)
-4. [Use Case 3: Convert an Existing Project with Codex (ChatGPT)](#use-case-3-convert-an-existing-project-with-codex-chatgpt)
-5. [Installing the Skills](#installing-the-skills)
-6. [Setting Up Author Defaults](#setting-up-author-defaults)
-7. [Running the Analysis](#running-the-analysis)
-8. [Creating the Replication Zip](#creating-the-replication-zip)
+1. [Quick Start](#quick-start)
+2. [Repository Layout](#repository-layout)
+3. [Use Case 1: Start a New Project from Scratch](#use-case-1-start-a-new-project-from-scratch)
+4. [Use Case 2: Convert an Existing Project with the Claude Skill](#use-case-2-convert-an-existing-project-with-the-claude-skill)
+5. [Use Case 3: Convert an Existing Project with Codex (ChatGPT)](#use-case-3-convert-an-existing-project-with-codex-chatgpt)
+6. [Installing the Skills](#installing-the-skills)
+7. [Paper and Author Information](#paper-and-author-information)
+8. [Running the Analysis](#running-the-analysis)
+9. [Creating the Replication Zip](#creating-the-replication-zip)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Quick Start
+
+You only install the skill. You do **not** clone this repository or edit any configuration file:
+the skill carries its own copy of the template and creates the package folder. Paper and author
+information (all co-authors) is read from your paper's LaTeX, completed with web searches, and
+confirmed with you; it is stored in the package itself (`replication-info.json`).
+
+1. **Install the skill once** — download [`create-replication-package.skill`](.claude/skills/create-replication-package.skill) and
+   - *Claude desktop app / claude.ai:* add it as a custom skill in Claude's skills settings;
+   - *Claude Code:* `unzip create-replication-package.skill -d ~/.claude/skills/`;
+   - *Codex:* `unzip create-replication-package.skill -d ~/.agents/skills/`.
+2. Ask: *"Create a replication package for my paper."*
+3. Answer the three opening questions:
+   - **Where is the original project folder?** (e.g. `~/Dropbox/Papers/MyProject`)
+   - **Do you have a manuscript ID?** (e.g. `MS20230792` — or "not yet")
+   - **Where should the replication package go?** Accept the default — `MyProject-shared/<ID>-replication` in your other synced drive (e.g. Google Drive) at the same relative path — or give another location.
+4. Confirm the authors the skill found (names, order, affiliations, e-mails, ORCIDs, websites) and say which computer ran the analysis.
+5. Confirm the decisions at each checkpoint (final `.tex`, figure/table names, migration plan, licensed data).
+6. When it finishes: create the environment, run `index.ipynb`, check the table comparison, run `replication-zip.ipynb`, upload the zips.
+
+**Starting a new paper?** Ask *"Set up a new paper project with the replication template"* — the skill creates the folder structure for you (see [Use Case 1](#use-case-1-start-a-new-project-from-scratch)).
 
 ---
 
@@ -29,265 +55,245 @@ replication-folder-template/
 ├── 2-appendix/               # LaTeX source for the appendix
 ├── replication-package/      # Self-contained, submittable replication package
 │   ├── index.ipynb           # Master notebook — runs the full analysis
+│   ├── README.md             # Social Science Data Editors README template
 │   ├── environment.yml       # Conda/Mamba environment (Python 3.11 + base R)
 │   ├── environment.R         # Additional R packages via renv
 │   ├── create_env.sh         # One-step environment creation script
 │   ├── setup.do              # Stata package installer
-│   ├── progs/Python/         # Python Jupyter notebooks
-│   ├── progs/Stata/          # Stata Jupyter notebooks (stata_kernel)
-│   └── progs/R/              # R Jupyter notebooks (IRkernel)
+│   ├── progs/Python/         # Python notebooks (incl. Renaming.ipynb, Copy-Final.ipynb)
+│   ├── progs/Stata/          # Stata notebooks (pystata: python3 kernel + %%stata)
+│   └── progs/R/              # R notebooks (IRkernel)
 ├── replication-zip.ipynb     # Creates distributable zips for journal submission
-├── .claude/skills/           # Claude Code skill (create-replication-package)
+├── .claude/skills/           # Claude skill (instructions, scripts, bundled template copy) + packaged .skill file
 ├── .agents/skills/           # Codex / ChatGPT agent (create-replication-package)
-└── .replication_defaults.yml.example  # Author info template
 ```
 
 ---
 
 ## Use Case 1: Start a New Project from Scratch
 
-Use this repo as your project folder **from day one** so everything stays organized and you're always ready to generate a replication package.
+Use the template as your project folder **from day one** so you are always ready to produce a replication package.
 
-### Step 1 — Clone the repo
+### Step 1 — Create the folder
 
-```bash
-git clone https://github.com/ozak/replication-folder-template my-paper
-cd my-paper
-```
+Ask the skill: *"Set up a new paper project with the replication template."* It asks where the folder should go, the project name, the working title and the co-authors' names; looks up each author's affiliation, e-mail, website and ORCID on the web; asks you to confirm them; and creates the structure (no cloning).
 
-### Step 2 — Set up author defaults (once, globally)
+*Without the skill:* `git clone https://github.com/ozak/replication-folder-template my-paper`, delete `.git`, `.claude/`, `.agents/`, `CLAUDE.md`, and replace the `{{title}}`, `{{authors_...}}` placeholders yourself.
 
-Copy the example file and fill in your details:
-
-```bash
-cp .replication_defaults.yml.example .replication_defaults.yml
-# Then edit .replication_defaults.yml with your name, email, ORCID, affiliation, etc.
-```
-
-`.replication_defaults.yml` is gitignored. The skill walks up the directory tree to find it, so placing it here makes it available to all projects nested inside this folder.
-
-### Step 3 — Set up the environment
+### Step 2 — Set up the environment
 
 ```bash
 cd replication-package
 bash create_env.sh
 ```
 
-This creates a Mamba/Conda environment with Python 3.11, Jupyter, Stata kernel, R, and IRkernel. On macOS it applies Apple Silicon optimizations automatically.
+This creates a Mamba/Conda environment with Python 3.11, Jupyter, pystata support, R and IRkernel. On macOS it applies Apple Silicon optimizations automatically.
 
-### Step 4 — Write your code
+### Step 3 — Work inside the structure
 
-- Put Python analysis notebooks in `replication-package/progs/Python/`
-- Put Stata `.do` files / notebooks in `replication-package/progs/Stata/`
-- Put R scripts / notebooks in `replication-package/progs/R/`
-- Raw/input data goes in `replication-package/raw-data/<source>/`
-- LaTeX source goes in `1-paper/` and `2-appendix/`
+- Python notebooks in `replication-package/progs/Python/`, Stata in `progs/Stata/` (pystata notebooks: first cell `import stata_init`, then `%%stata` cells), R in `progs/R/`
+- Raw/input data in `replication-package/raw-data/<Source>/` (one folder per provider); data created by code in `data/<Step>/`
+- All paths relative to the notebook's folder: `../../raw-data/...`, `../../data/...`
+- LaTeX in `1-paper/` and `2-appendix/`; final figures/tables in `graphs|tables/(paper|appendix)/`, named `Figure-1-a`, `Table-D3`, … (see the naming rules in `.claude/skills/create-replication-package/references/naming-conventions.md`)
+- In the paper, keep each table's caption, column headers and notes in the `.tex` and `\input` only the body produced by the code
 
-### Step 5 — Orchestrate from `index.ipynb`
+### Step 4 — Orchestrate from `index.ipynb`
 
-Open `replication-package/index.ipynb`. For each analysis step, add a cell that calls `jupyter nbconvert --execute` on the corresponding notebook. The template includes color-coded section headers:
+Add one step per notebook to `replication-package/index.ipynb` (the template shows the pattern). Header colors:
 
 | Color | Meaning |
 |---|---|
 | Blue | Normal step |
-| Red | Computationally expensive |
-| Green | Robustness check / test |
+| Red | Computationally expensive (guarded with `should_I_run = False`) |
+| Green | Test / robustness check |
 
-When you're ready to submit, run `replication-zip.ipynb` from the repo root to create the submission zips.
+When you're ready to submit, run `replication-zip.ipynb`. You can also run the skill on the project at any time to check and finish it.
 
 ---
 
-## Use Case 2: Convert an Existing Project with Claude Code
+## Use Case 2: Convert an Existing Project with the Claude Skill
 
-If you already have a working research project and want to convert it into a journal-ready replication package, the **`create-replication-package`** Claude Code skill automates the entire process.
+The **`create-replication-package`** skill turns a working (usually messy) research folder into a journal-ready package. It works in **Claude Code** (terminal) and in **Claude's desktop app (Cowork)** with your folders connected.
 
-### Prerequisites
+### What to have ready
 
-- [Claude Code](https://claude.ai/code) installed (`npm install -g @anthropic-ai/claude-code`)
-- This repo cloned somewhere on your machine (or internet access so the skill can clone it)
+- The original project folder (code, data, paper sources). Co-author copies, external data drives or a journal-submission folder can be added as extra sources.
+- The final version of the paper's LaTeX (the skill shows the candidates it finds and asks which one is final).
+- Your manuscript ID, if you have one.
+- Nothing about your software setup: the skill finds the conda/mamba environment, R, Stata and Julia setup your code used and asks you to confirm.
+- Which datasets are licensed or confidential.
+- Nothing to install or configure beyond the skill itself: the template comes with the skill, and the authors are taken from your paper (and the web) and confirmed with you.
 
-### Install the skill
+### Start it
 
-See [Installing the Skills](#installing-the-skills) below.
-
-### Run the skill
-
-Open Claude Code **from your existing project folder** (or any folder):
-
+**Claude Code:**
 ```bash
-cd /path/to/your/existing/research/project
+cd /path/to/your/research/project
 claude
 ```
+then type `/create-replication-package`, or just *"Create a replication package for my paper"*.
 
-Then type:
+**Claude desktop app (Cowork):** connect the original folder (and the destination's parent folder, e.g. your Google Drive) and ask *"Create a replication package for my paper"*. The skill asks for access to exactly the folders it needs.
+
+### What it asks first
+
+1. **Where is the original project folder?** (plus any other folders with material for this paper)
+2. **Do you have a manuscript ID?** (if not, it uses the project name and later looks for an ID in file names such as editor letters)
+3. **Where should the replication package go?** The default follows this layout:
 
 ```
-/create-replication-package
+<synced drive A, e.g. Dropbox>/<path>/<Project>/                          original — never modified
+<synced drive B, e.g. Google Drive>/<path>/<Project>-shared/               shared with co-authors
+<synced drive B, e.g. Google Drive>/<path>/<Project>-shared/<ID>-replication/   ← the package
 ```
 
-Or describe what you want in plain English — the skill triggers automatically on phrases like:
+You can choose "next to the original" or any other path. The skill refuses destinations inside the original folder and never writes into a non-empty folder.
 
-> *"Create a replication package for my paper"*
-> *"Prepare my code for AEA/QJE submission"*
-> *"Package my research for journal replication requirements"*
+### What it does
 
-### What the skill does
+| Phase | What happens | Your checkpoint |
+|---|---|---|
+| **0 — Locations** | The three questions above; validates the destination | — |
+| **1 — Discover** | Surveys the project (and extra sources): candidate `.tex` versions, code by language, data sizes, absolute paths, earlier replication attempts, online-only cloud files (downloaded automatically). Extracts title and **all authors** from the final `.tex` and completes missing affiliations, e-mails, ORCIDs and websites by web search. Detects the **software environment** used: kernelspecs and `mamba activate` lines in the code, environment/requirements/renv files, and the environments on your machine ranked by how many of the code's imports they provide | Final `.tex`; **the author list and details**; **which mamba/conda environment (and R/Stata/Julia setup) was used**; journal, licensed data, slow/cluster steps |
+| **2 — Map & trace** | Names every figure and table as LaTeX prints them; finds the files behind tables pasted into the `.tex`; traces each output back to the code and raw data that produce it, so only what the paper needs is migrated | Rename map and migration plan |
+| **3 — Scaffold** | Creates the package from the template bundled with the skill, stores the confirmed paper/author info in `replication-info.json` and fills the README, notebooks and paper templates from it. Builds `environment.yml` **from the environment you used** (explicitly installed packages, pinned), `environment.R` for R packages outside the env (pinned to your installed versions), and `setup.do` installing each Stata package from the source you installed it from (packages shipped as `.ado` in the project are kept instead) | Packages the code imports but your environment lacks; computer used |
+| **4 — Migrate** | Copies raw data into `raw-data/<Source>/`; converts each script to a notebook (same code, same order; Stata via pystata); makes every path relative | — |
+| **5 — Names & LaTeX** | Writes `1-paper/` and `2-appendix/` `.tex` files pointing at the standardized outputs; builds `Renaming.ipynb`; compares tables | Any table whose numbers differ |
+| **6 — index.ipynb** | One step per notebook in dependency order; slow steps guarded, with cluster/local options and tests against shipped data | — |
+| **7 — README & zips** | Fills the Data Editors README; sets zip exclusions for licensed data *and the files derived from it* | Exclusion list |
+| **8 — Verify** | Static package check, table comparison, optional execution of notebooks | Final report |
 
-The skill runs a guided, multi-phase workflow:
+### Principles it follows
 
-| Phase | What happens |
-|---|---|
-| **1 — Discover** | Scans your project: finds `.tex`, `.py`, `.do`, `.R` files, data directories, conda environment |
-| **2 — Scaffold** | Clones this template into a new `<ManuscriptID>-replication/` folder, applies your author defaults, removes template placeholders |
-| **3 — Migrate code** | Converts `.py`/`.do`/`.R` scripts to Jupyter notebooks; copies existing notebooks; preserves cluster scripts |
-| **4 — Rename outputs** | Parses your LaTeX to extract figure/table numbering, renames files to `Figure-N.pdf` / `Table-N.tex` convention, updates LaTeX `\includegraphics` paths |
-| **5 — Configure** | Builds `index.ipynb`, customizes `README.md`, sets up `replication-zip.ipynb` exclusions for licensed data |
+- **Your original folders are never modified.** Nothing is created, edited, moved or deleted there; code is never run in place. The bundled scripts refuse to write anywhere except the destination.
+- **Only the code the paper needs.** Source folders often mix papers, versions and experiments; the skill traces from the final figures and tables back to code and data.
+- **Code stays as close to the original as possible.** One script becomes one notebook with the same code; only paths, plumbing and output file names change (every change is logged). Code is consolidated only if you ask.
+- **Numbers from the code, presentation from the final paper.** Each table's caption, column headers and notes stay in the paper's `.tex` exactly as in your final version; the code produces only the body, which the paper `\input`s. This applies both to tables pasted into the `.tex` and to hand-edited table files the paper included — their header/footer are moved into the paper. Rows you removed or labels you edited in the paper are reapplied, and a comparison checks that every printed number is reproduced.
+- **Online-only Dropbox/Google Drive files** are downloaded as needed; you don't have to do anything.
+- **Nothing is installed without asking.**
 
-The skill asks for confirmation at key decision points (LaTeX file to use, manuscript ID, conda environment, licensed datasets) before making changes.
+### What you get
 
-### Notebook conversion example
+```
+<ID>-replication/
+├── _migration/            # how the package was built: inventory, rename map, lineage report,
+│                          #   plan, migration log, original table bodies (not zipped)
+├── 1-paper/               # <ID>-main-<date>.tex + graphs/ tables/ it references
+├── 2-appendix/            # <ID>-appendix-<date>.tex + graphs/ tables/
+├── replication-package/   # index.ipynb, README.md, environment, progs/, raw-data/, data/, outputs
+└── replication-zip.ipynb
+```
 
-A script like `analysis.py` becomes `progs/Python/Analysis.ipynb` with each logical block in its own cell. A `regression.do` becomes `progs/Stata/Regression.ipynb` with the Stata kernel.
+### After the skill finishes
+
+1. `cd replication-package && bash create_env.sh` (once).
+2. In Stata: `do setup.do` (once).
+3. Open `index.ipynb`, set `STATA_location`/`version` in the first cell, restart and run all (slow steps stay off unless you switch them on).
+4. Check tables: ask the skill to *"compare the tables"* (it runs `compare_tables.py`) — all tables should show ✅.
+5. Compile `1-paper/` and `2-appendix/` and compare with your submitted PDF.
+6. Run `replication-zip.ipynb`, then upload `3-replication-package.zip` (public) to Zenodo / the journal's repository and send `4-confidential-data-not-for-publication.zip` to the data editor if required.
 
 ---
 
 ## Use Case 3: Convert an Existing Project with Codex (ChatGPT)
 
-The same workflow is available in **Codex** (ChatGPT with code execution) via the `.agents/` skill.
+The same workflow is available in **Codex** via the `.agents/` copy of the skill (identical instructions and scripts).
 
-### Prerequisites
-
-- Access to [ChatGPT with Codex](https://chatgpt.com) (requires a plan with code execution)
-- This repo available to your Codex environment (cloned or uploaded)
-
-### Install the agent
-
-See [Installing the Skills](#installing-the-skills) below.
-
-### Run the agent
-
-In a Codex session, use the agent trigger phrase:
-
-```
-Use $create-replication-package to turn this research project into a journal-ready replication package.
-```
-
-Or describe your goal — the agent's `allow_implicit_invocation: true` setting means it activates on natural language requests about replication packages.
-
-The agent follows the same five-phase workflow as the Claude Code skill and produces the same folder structure and output.
+1. Install the skill (see below) — no need to clone this repo.
+2. Say: `Use $create-replication-package to turn this research project into a journal-ready replication package.` — or describe the goal; `allow_implicit_invocation: true` lets it trigger on natural requests.
+3. Answer the same three opening questions and checkpoints as above.
 
 ---
 
 ## Installing the Skills
 
-### Claude Code skill
+The packaged skill [`.claude/skills/create-replication-package.skill`](.claude/skills/create-replication-package.skill) is a zip of the skill folder, which contains the instructions, the helper scripts and a bundled copy of this template (`assets/template/`). That single file is all a user needs.
 
-The skill lives in `.claude/skills/create-replication-package/`. To make it available in Claude Code:
+| Where | How |
+|---|---|
+| Claude desktop app / claude.ai | Add `create-replication-package.skill` as a custom skill in Claude's skills settings |
+| Claude Code (any project) | `unzip create-replication-package.skill -d ~/.claude/skills/` — check with `/skills` |
+| Claude Code (inside this repo) | Nothing: `.claude/skills/` is picked up automatically |
+| Codex | `unzip create-replication-package.skill -d ~/.agents/skills/` (the repo's `.agents/` copy also includes `agents/openai.yaml`) |
 
-**Option A — Project-local (only available in this repo):**
-The skill is already present in `.claude/skills/` — Claude Code picks it up automatically when you open this folder.
-
-**Option B — Global install (available in any project):**
-Copy the skill folder to your global Claude skills directory:
-
+To follow the repository instead of a downloaded copy, symlink the folder:
 ```bash
-mkdir -p ~/.claude/skills
-cp -r .claude/skills/create-replication-package ~/.claude/skills/
+ln -s "/path/to/replication-folder-template/.claude/skills/create-replication-package" ~/.claude/skills/
 ```
 
-You can then run `/create-replication-package` from **any** project folder in Claude Code.
+**Requirements:** Python ≥ 3.9 (the scripts use only the standard library). Running a finished package needs Mamba/Conda, Jupyter, and Stata/R if the paper uses them.
 
-**Option C — Symlink (stays in sync with this repo):**
+**For template maintainers:** after editing `1-paper/`, `2-appendix/`, `replication-package/` or `replication-zip.ipynb`, refresh the copy bundled with the skill and rebuild the `.skill` file:
 ```bash
-mkdir -p ~/.claude/skills
-ln -s "$(pwd)/.claude/skills/create-replication-package" ~/.claude/skills/create-replication-package
+python3 .claude/skills/create-replication-package/scripts/sync_template.py
+python3 .agents/skills/create-replication-package/scripts/sync_template.py
+(cd .claude/skills && rm -f create-replication-package.skill && zip -r create-replication-package.skill create-replication-package -x '*.DS_Store' '*__pycache__*')
 ```
-
-After installing, verify with `/skills` in Claude Code — `create-replication-package` should appear in the list.
-
-### Codex agent
-
-The Codex agent configuration lives in `.agents/skills/create-replication-package/agents/openai.yaml`.
-
-**Install:**
-```bash
-mkdir -p ~/.agents/skills
-cp -r .agents/skills/create-replication-package ~/.agents/skills/
-```
-
-Or configure it directly in your Codex environment by uploading the `.agents/` folder contents.
 
 ---
 
-## Setting Up Author Defaults
+## Paper and Author Information
 
-The skill auto-fills your name, email, ORCID, affiliation, and compute specs into every new replication package. Set this up once by copying the example file and editing it in place:
+There is no personal profile to set up: papers have different co-authors, so the information belongs to each package. The skill builds `replication-info.json` in the replication folder:
 
-```bash
-cp .replication_defaults.yml.example .replication_defaults.yml
-```
+1. **Extract** the title and every author (with affiliation, e-mail and ORCID where printed) from the final `.tex` — `\author`/`\and`, `\thanks`, `\footnote`, `authblk`'s `\affil` are all handled.
+2. **Complete** missing affiliations, websites, ORCIDs and e-mails with web searches (faculty pages, ORCID, RePEc/IDEAS), recording each source.
+3. **Confirm** with you: the skill shows the list and only uses it once you confirm that these are the authors, in this order, with these details.
 
-Edit `.replication_defaults.yml`:
+For a **new project**, it asks for the working title and your co-authors' names, then does steps 2–3.
 
-```yaml
-author_name: "Jane Smith"
-author_last_name: "Smith"
-author_website: "https://janesmith.com"
-author_email: "jsmith@university.edu"
-author_orcid: "0000-0000-0000-0000"
-author_affiliation: "Department of Economics, University of Somewhere"
-author_affiliation_short: "UoS"
-author_grants: "Funded by NSF Grant #XXX"
-
-laptop_specs: "MacBook Pro M3, 36 GB RAM, macOS 15"
-laptop_memory: "36 GB RAM"
-cluster_specs: "University HPC cluster using the `normal` queue (32-core nodes, 256 GB RAM)"
-compute_hours: "48 computing hours (~2 actual days)"
-
-institution_logo_url: "https://university.edu/logo.png"
-institution_logo_width: "200"
-institution_logo_link: "https://university.edu"
-```
-
-The skill walks up the directory tree to find this file, so it works from any subfolder of your project.
+The README (title block, contributors, suggested citation, computational requirements), `index.ipynb` and the paper/appendix templates are filled from this file. To change something later, ask the skill (it edits the file with `project_info.py set`, asks you to confirm, and refills the templates).
 
 ---
 
 ## Running the Analysis
 
-Configure and run from `replication-package/index.ipynb`:
+From `replication-package/index.ipynb`:
 
-1. Edit the first cell: set `STATA_location` (e.g., `/Applications/Stata`) and `version` (e.g., `mp`).
-2. Run that cell — it writes `progs/Stata/stata_init.py` for child Stata notebooks.
-3. Launch JupyterLab:
+1. Edit the first cell: `STATA_location` (e.g. `/Applications/Stata`) and `version` (e.g. `mp`).
+2. Run it — it writes `progs/Stata/stata_init.py`, which every Stata notebook imports.
+3. Launch JupyterLab in the environment:
    ```bash
    mamba activate <env-name>
    jupyter lab
    ```
-4. Open `index.ipynb`, restart the kernel, and run all cells.
+4. Open `index.ipynb`, restart the kernel, run all cells. Each step executes a notebook and shows its HTML output.
 
-**Run a single notebook from the command line:**
+**Run a single notebook (Python or Stata/pystata):**
 ```bash
-cd replication-package/progs/Python
+cd replication-package/progs/Python      # or progs/Stata
 jupyter nbconvert "Analysis.ipynb" --to notebook \
-  --ExecutePreprocessor.kernel_name=python3 --execute \
-  --output "Analysis.ipynb"
+  --ExecutePreprocessor.kernel_name=python3 --execute --output "Analysis.ipynb"
 ```
 
 ---
 
 ## Creating the Replication Zip
 
-Run `replication-zip.ipynb` from the repo root. It produces:
+Run `replication-zip.ipynb` from the folder that contains `replication-package/`. It produces:
 
-- `3-replication-package.zip` — public files only (excludes licensed/confidential data)
-- `4-confidential-data-not-for-publication.zip` — excluded files
-- `full-replication.zip` — paper + appendix + both zips (for journal submission)
+- `3-replication-package.zip` — public files only
+- `4-confidential-data-not-for-publication.zip` — the excluded (licensed/confidential) files
+- `full-replication.zip` — both zips plus the journal checklist, for the editor
 
-Mark datasets to exclude in the designated cell:
+Exclusions go in the designated cells, one per licensed source **and its derived data**:
 ```python
-df_files.loc[df_files['path'].str.contains('raw-data/IPUMS'), 'include'] = False
+df_files.loc[df_files['file_path'].str.contains('raw-data/LicensedSource'), 'include'] = False
+df_files.loc[df_files['file_path'].str.contains('data/DerivedFromLicensedSource'), 'include'] = False
 ```
+The notebook also writes `directory_structure.{txt,html,md}` (shown in the README's file list).
+
+---
+
+## Troubleshooting
+
+| Problem | What to do |
+|---|---|
+| "Resource deadlock avoided" when reading Dropbox/Google Drive files | Those are online-only files. The skill downloads them through the host automatically; on your own Mac, opening them downloads them. |
+| A table shows ❌ in `compare_tables.py` | The code does not reproduce the printed numbers: check the script version, data vintage, sample or seed — never edit the numbers. Suggested `drop_rows` / `replace` fixes are only for presentation differences. |
+| `REFUSED: … read-only source folder` | Working as intended — a script tried to write into an original folder. Write to the replication folder instead. |
+| A Stata notebook fails with `No module named stata_init` | Run the first cell of `index.ipynb` (it writes `progs/Stata/stata_init.py`). |
+| Figure/table missing when compiling `1-paper/` | Run `Renaming.ipynb` then `Copy-Final.ipynb` (or the last part of `index.ipynb`). |
 
 ---
 

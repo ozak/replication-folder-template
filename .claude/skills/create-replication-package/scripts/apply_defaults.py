@@ -1,146 +1,71 @@
 #!/usr/bin/env python3
 """
-Substitute {{placeholder}} tokens in replication package files using values
-from a .replication_defaults.yml file.
+Fill the template's {{token}} placeholders in a replication folder from the package's own
+information file, <target>/replication-info.json (see project_info.py): title, authors (all
+co-authors, with links, affiliations, ORCIDs), citation, compute specs and logos.
 
 Usage:
-    python scripts/apply_defaults.py <target-dir> [--defaults <path>]
+    python apply_defaults.py <target-dir> [--info <target>/replication-info.json] [--dry-run]
 
-Searches for .replication_defaults.yml starting from the target directory,
-then walking up to the user's home directory. Replaces all {{key}} tokens
-in text files under target-dir with the corresponding values.
-
-If no defaults file is found, prints a warning and lists the unfilled tokens.
+The author list must have been confirmed by the user (project_info.py confirm); otherwise the
+author tokens are left in place and the script exits with an error. Tokens without a value are
+reported so the agent can ask for them. Binary files and .git are skipped.
 """
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    # Fallback: minimal YAML parser for simple key: "value" files
-    def yaml_load(text):
-        result = {}
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" in line:
-                key, _, val = line.partition(":")
-                val = val.strip().strip('"').strip("'")
-                result[key.strip()] = val
-        return result
-    class yaml:
-        @staticmethod
-        def safe_load(text):
-            return yaml_load(text)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _safety import assert_writable  # noqa: E402
+from project_info import load, tokens  # noqa: E402
 
-
-SKIP_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".pdf", ".eps", ".svg", ".gif",
-    ".zip", ".gz", ".tar", ".pkl", ".dta", ".parquet",
-    ".pyc", ".so", ".skill",
-}
-
+SKIP_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".eps", ".svg", ".gif", ".zip", ".gz", ".tar", ".pkl",
+                   ".dta", ".parquet", ".pyc", ".so", ".skill"}
 TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
-def find_defaults(start: Path) -> Path | None:
-    """Walk up from start toward home looking for .replication_defaults.yml."""
-    home = Path.home()
-    current = start.resolve()
-    while True:
-        candidate = current / ".replication_defaults.yml"
-        if candidate.exists():
-            return candidate
-        if current == home or current == current.parent:
-            break
-        current = current.parent
-    # Also check home directly
-    candidate = home / ".replication_defaults.yml"
-    return candidate if candidate.exists() else None
-
-
-def apply_to_file(path: Path, defaults: dict) -> int:
-    """Substitute tokens in a single file. Returns number of substitutions made."""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return 0
-
-    tokens_found = set(TOKEN_RE.findall(text))
-    if not tokens_found:
-        return 0
-
-    count = 0
-    for token in tokens_found:
-        if token in defaults:
-            text = text.replace(f"{{{{{token}}}}}", defaults[token])
-            count += 1
-
-    path.write_text(text, encoding="utf-8")
-    return count
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Apply replication defaults to template files")
-    parser.add_argument("target_dir", type=Path, help="Directory to process")
-    parser.add_argument("--defaults", type=Path, default=None,
-                        help="Path to .replication_defaults.yml (auto-detected if omitted)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would be changed without writing")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("target_dir", type=Path)
+    ap.add_argument("--info", type=Path, default=None)
+    ap.add_argument("--dry-run", action="store_true")
+    a = ap.parse_args()
+    t = a.target_dir
+    info_path = a.info or t / "replication-info.json"
+    if not info_path.exists():
+        sys.exit(f"⚠️  {info_path} not found — create it with project_info.py (extract / set) and confirm it with the user.")
+    info = load(info_path)
+    if not info.get("confirmed"):
+        sys.exit("⚠️  The author list in replication-info.json is not confirmed by the user yet "
+                 "(show it with project_info.py show, then project_info.py confirm).")
+    T = {k: ("" if v is None else str(v)) for k, v in tokens(info).items()}
+    important = {"title", "year", "authors_and", "laptop_specs", "laptop_memory"}
 
-    if not args.target_dir.exists():
-        print(f"Error: target directory not found: {args.target_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    defaults_path = args.defaults or find_defaults(args.target_dir)
-    if not defaults_path:
-        print("⚠️  No .replication_defaults.yml found. Copy .replication_defaults.yml.example,",
-              "fill in your details, and re-run.", file=sys.stderr)
-        # Still scan for unfilled tokens so the user knows what's needed
-        all_tokens = set()
-        for f in args.target_dir.rglob("*"):
-            if f.is_file() and f.suffix.lower() not in SKIP_EXTENSIONS:
-                try:
-                    all_tokens.update(TOKEN_RE.findall(f.read_text(encoding="utf-8", errors="replace")))
-                except Exception:
-                    pass
-        if all_tokens:
-            print(f"Unfilled tokens found: {sorted(all_tokens)}", file=sys.stderr)
-        sys.exit(1)
-
-    defaults = yaml.safe_load(defaults_path.read_text(encoding="utf-8"))
-    print(f"Using defaults from: {defaults_path}")
-
-    total = 0
-    for f in sorted(args.target_dir.rglob("*")):
-        if not f.is_file():
+    total, unfilled = 0, set()
+    for f in sorted(t.rglob("*")):
+        if not f.is_file() or f.suffix.lower() in SKIP_EXTENSIONS or ".git" in f.parts or "_migration" in f.parts:
             continue
-        if f.suffix.lower() in SKIP_EXTENSIONS:
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
             continue
-        if ".git" in f.parts:
+        found = set(TOKEN_RE.findall(text))
+        if not found:
             continue
-
-        if args.dry_run:
-            try:
-                text = f.read_text(encoding="utf-8", errors="replace")
-                tokens = set(TOKEN_RE.findall(text))
-                if tokens:
-                    print(f"  {f.relative_to(args.target_dir)}: {sorted(tokens)}")
-            except Exception:
-                pass
-        else:
-            n = apply_to_file(f, defaults)
-            if n:
-                print(f"  {f.relative_to(args.target_dir)}: {n} substitution(s)")
-                total += n
-
-    if not args.dry_run:
-        print(f"✅ {total} total substitution(s) applied from {defaults_path.name}")
+        new = TOKEN_RE.sub(lambda m: T.get(m.group(1), m.group(0)), text)
+        unfilled |= {x for x in found if x not in T or (x in important and not T[x])}
+        n = sum(1 for x in found if x in T)
+        if n and not a.dry_run and new != text:
+            assert_writable(f)
+            f.write_text(new, encoding="utf-8")
+        if n:
+            print(f"  {f.relative_to(t)}: {n} token(s){' (dry run)' if a.dry_run else ''}")
+            total += n
+    print(f"✅ {total} token(s) filled from {info_path.name}")
+    if unfilled:
+        print(f"⚠️  still unfilled (ask the user, then project_info.py set ...): {sorted(unfilled)}")
 
 
 if __name__ == "__main__":
