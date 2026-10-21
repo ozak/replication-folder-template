@@ -24,10 +24,16 @@ What it reports
   * For Stata: packages installed in the user's PLUS folder (stata.trk) with their source URLs.
   * For R: installed versions found in the env's R library or the user's R libraries.
 
---write-r writes environment.R that installs, with renv, the R packages the code uses that the
-conda env does not already provide (pinned to the installed versions when known).
+Also reported: software versions to record (Python/R of the env, Stata `version` statements in the
+code and Stata installations on the machine), packages installed from GitHub (with the commit), and
+code that downloads at runtime (packages known to fetch data on first use, URLs/download calls).
+
+--write-r writes environment.R: the R packages the code uses that the R env (environment-R.yml next
+to it, from export_env.py --r-out) does not provide, at the authors' versions (CRAN archive) or
+GitHub commits, dependents first and the packages they depend on LAST (so an extension cannot
+upgrade its core package), then one version check per package.
 --write-stata writes setup.do that installs the user-written Stata packages the code uses, from the
-exact source each was installed from (stata.trk), with adolist as an alternative.
+exact source each was installed from (stata.trk), with the installed version/date as a comment.
 Read-only on the project and on environments; writes only the requested outputs.
 """
 import argparse
@@ -60,6 +66,14 @@ COMMON_SSC = {"reghdfe", "ftools", "estout", "esttab", "eststo", "estadd", "outr
               "x_ols", "sxpose", "adolist", "grc1leg", "tuples", "rwolf", "wyoung", "psacalc", "texsave", "listtex",
               "ietoolkit", "missings", "statastates", "jarowinkler", "strgroup", "mdesc", "parmest", "regsave", "matsave",
               "erepost", "avar", "nwcommands", "spatwmat", "spatreg", "xtabond2", "synth", "rd", "rdplot", "cmogram", "conley"}
+# packages that download data on first import / first use (offline compute nodes fail)
+DOWNLOADS_AT_IMPORT = {"geostats": "dataset from Zenodo", "cartopy": "Natural Earth shapefiles", "nltk": "corpora (nltk.download)",
+                       "osmnx": "OpenStreetMap queries", "pygris": "Census TIGER files", "geodatasets": "example data",
+                       "wbdata": "World Bank API", "pandas_datareader": "remote data APIs", "yfinance": "Yahoo Finance",
+                       "tigris": "Census TIGER files (R)", "rnaturalearth": "Natural Earth (R)", "tidycensus": "Census API (R)",
+                       "WDI": "World Bank API (R)", "osmdata": "OpenStreetMap (R)", "geodata": "GADM/WorldClim downloads (R)"}
+RE_DOWNLOAD = re.compile(r"(https?://[^\s'\"\)]+)|\b(urlretrieve|urlopen|requests\.get|wget|curl\s|download\.file|"
+                         r"\.download\(|copy\s+\"?https?:|webuse|ssc\s+install|net\s+install)", re.I)
 ESTOUT_ALIASES = {"esttab": "estout", "eststo": "estout", "estadd": "estout", "estpost": "estout"}
 
 
@@ -158,7 +172,12 @@ def scan_project(roots, only=None):
                     needs["r"][x] += 1
             for m in re.finditer(r"\b([A-Za-z][\w.]+)::", txt):
                 needs["r"][m.group(1)] += 1
+        for m in RE_DOWNLOAD.finditer(txt):
+            if lang != "shell" or "download" in (m.group(0) or "").lower():
+                ev["downloads"].append((name, (m.group(0) or "")[:90]))
         if lang == "stata":
+            for m in re.finditer(r"(?m)^\s*version\s+(\d+(?:\.\d+)?)\b", txt):
+                ev["stata_version"].append((m.group(1), name))
             for m in re.finditer(r"(?:ssc|net)\s+install\s+([\w-]+)", txt):
                 needs["stata"][m.group(1).lower()] += 1
             for cmd in COMMON_SSC:
@@ -266,7 +285,22 @@ def requested_specs(prefix):
     return out
 
 
+def r_description(desc):
+    t = desc.read_text(errors="replace")
+    t = re.sub(r"\n[ \t]+", " ", t)          # join continuation lines
+    f = dict(re.findall(r"^([\w/@.-]+):\s*(.*)$", t, re.M))
+    deps = []
+    for k in ("Depends", "Imports", "LinkingTo"):
+        deps += [re.split(r"[\s(]", x.strip())[0] for x in f.get(k, "").split(",") if x.strip()]
+    remote = ""
+    if f.get("RemoteType", "").lower() == "github" and f.get("RemoteSha"):
+        remote = f"{f.get('RemoteUsername', '')}/{f.get('RemoteRepo', '')}@{f['RemoteSha']}"
+    return f.get("Version", ""), {"deps": [d for d in deps if d and d != "R"], "remote": remote,
+                                  "repository": f.get("Repository", "")}
+
+
 def r_libraries(extra):
+    """{package: (version, library, {deps, remote, repository})} from the R libraries found"""
     home = Path.home()
     libs = [Path(x).expanduser() for x in extra] + list(home.glob("Library/R/*/*/library")) + \
         list(Path("/Library/Frameworks/R.framework/Versions").glob("*/Resources/library")) + \
@@ -277,28 +311,110 @@ def r_libraries(extra):
             for d in lib.iterdir():
                 desc = d / "DESCRIPTION"
                 if desc.exists() and d.name not in found:
-                    v = re.search(r"^Version:\s*(\S+)", desc.read_text(errors="replace"), re.M)
-                    found[d.name] = (v.group(1) if v else "", str(lib))
+                    try:
+                        v, info = r_description(desc)
+                    except OSError:
+                        continue
+                    found[d.name] = (v, str(lib), info)
     return found
 
 
 def stata_trk(plus_dirs):
+    """(PLUS dir, {package: source}, {package: version/date text}) from stata.trk"""
     home = Path.home()
     cands = [Path(x).expanduser() for x in plus_dirs] + [home / "Library/Application Support/Stata/ado/plus", home / "ado/plus",
                                                          Path("C:/ado/plus")]
     for d in cands:
         trk = d / "stata.trk"
         if trk.exists():
-            pk, src = {}, ""
+            pk, info, src, cur = {}, {}, "", None
             for line in trk.read_text(errors="replace").splitlines():
                 if line.startswith("S "):
                     src = line[2:].strip()
                 elif line.startswith("N "):
-                    pk[line[2:].strip().replace(".pkg", "").lower()] = src
-                elif line.startswith("D ") and pk:
-                    pass
-            return d, pk
-    return None, {}
+                    cur = line[2:].strip().replace(".pkg", "").lower()
+                    pk[cur] = src
+                elif line.startswith("D ") and cur:
+                    info.setdefault(cur, {})["installed"] = line[2:].strip()
+                elif line.startswith("d ") and cur:
+                    t = line[2:].strip()
+                    m = re.search(r"(?:Distribution-Date|version|v\.?)\s*:?\s*([\w.]+)", t, re.I)
+                    if m and "version" not in info.setdefault(cur, {}):
+                        info[cur]["version"] = m.group(1) if "Distribution" not in t else f"dist {m.group(1)}"
+            return d, pk, info
+    return None, {}, {}
+
+
+def stata_installs():
+    """Stata installations visible on this machine (folder, flavor executables)"""
+    out = []
+    cands = list(Path("/Applications").glob("Stata*")) + list(Path("/usr/local").glob("stata*")) + \
+        list(Path("/opt").glob("stata*")) + list(Path("C:/Program Files").glob("Stata*"))
+    for c in cands:
+        exes = [x.name for x in c.glob("**/stata-*") if x.name in ("stata-mp", "stata-se", "stata-be")][:3] if c.is_dir() else []
+        out.append({"path": str(c), "flavors": exes, "pystata": (c / "utilities" / "pystata").is_dir()})
+    for exe in ("stata-mp", "stata-se", "stata"):
+        w = shutil.which(exe)
+        if w:
+            out.append({"path": str(Path(w).resolve().parent), "flavors": [exe], "pystata": (Path(w).resolve().parent / "utilities" / "pystata").is_dir()})
+    return out
+
+
+def yml_r_packages(path):
+    """R package names provided by an environment-R.yml (r-<name> entries)"""
+    try:
+        t = Path(path).read_text()
+    except OSError:
+        return set()
+    return {m.group(1) for m in re.finditer(r"^\s*-\s*r-([\w.]+)", t, re.M)} - {"base", "irkernel", "remotes", "renv"}
+
+
+def write_environment_r(path, needs_r, rlibs, provided, r_version):
+    """dependents first, the packages they depend on last, then version checks"""
+    todo = sorted(set(needs_r) - provided, key=str.lower)
+    if not todo:
+        return ["# All R packages used by the code are provided by environment-R.yml. Nothing to install here."], 0
+    deps = {p_: set(rlibs.get(p_, ("", "", {"deps": []}))[2]["deps"]) & set(todo) for p_ in todo}
+    # depth = length of the longest chain of packages (within todo) that depend on p_
+    rev = {p_: {q for q in todo if p_ in deps[q]} for p_ in todo}
+    depth = {}
+
+    def dep_depth(p_, seen=()):
+        if p_ in depth:
+            return depth[p_]
+        if p_ in seen:
+            return 0
+        depth[p_] = 1 + max([dep_depth(q, seen + (p_,)) for q in rev[p_]] or [-1])
+        return depth[p_]
+    order = sorted(todo, key=lambda p_: (dep_depth(p_), p_.lower()))
+    L = ["# Installs the R packages used by the code that environment-R.yml does not provide, at the",
+         "# authors' versions. Generated by detect_envs.py. Run inside the R environment:",
+         "#   mamba run -n <slug>-r Rscript environment.R",
+         f"# Authors' R version: {r_version or 'unknown — ask'}",
+         "# Order: packages that depend on others first; the packages they depend on LAST, so that",
+         "# installing an extension cannot upgrade its core package. Do not reorder.",
+         'options(repos = c(CRAN = "https://cloud.r-project.org"))',
+         'if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")',
+         'pin <- function(pkg, version) remotes::install_version(pkg, version = version, upgrade = "never", dependencies = NA)',
+         'gh  <- function(ref) remotes::install_github(ref, upgrade = "never", dependencies = NA)', ""]
+    checks, unknown = [], []
+    for p_ in order:
+        v, _, info = rlibs.get(p_, ("", "", {"remote": "", "deps": []}))
+        if info.get("remote"):
+            L.append(f'gh("{info["remote"]}")   # {p_} {v} from GitHub at a fixed commit')
+        elif v:
+            L.append(f'pin("{p_}", "{v}")')
+        else:
+            L.append(f'install.packages("{p_}")   # version not found on the authors\' machine — ask and pin')
+            unknown.append(p_)
+        if v:
+            checks.append(f'  "{p_}" = "{v}"')
+    L += ["", "# Every package must have the authors' version", "expected <- c(", ",\n".join(checks), ")",
+          "for (p in names(expected)) {",
+          "  got <- as.character(packageVersion(p))",
+          '  if (got != expected[[p]]) stop(sprintf("%s is %s, expected %s", p, got, expected[[p]]))',
+          "}", 'cat("All", length(expected), "R packages have the expected versions\\n")']
+    return L, len(todo)
 
 
 def main():
@@ -338,12 +454,23 @@ def main():
                        "py_have": sorted(have), "py_missing": sorted(py_needed - have),
                        "r_have": sorted(rhave), "r_missing": sorted(set(needs["r"]) - rhave), "score": score})
     ranked.sort(key=lambda x: -x["score"])
-    rlibs = r_libraries(a.r_lib)
-    plus, trk = stata_trk(a.stata_ado)
+    chosen = ranked[0] if ranked else None
+    env_rlib = [str(Path(chosen["prefix"]) / "lib" / "R" / "library")] if chosen else []
+    rlibs = r_libraries(env_rlib + a.r_lib)   # the chosen env's R library first
+    plus, trk, trk_info = stata_trk(a.stata_ado)
+    installs = stata_installs()
+    r_version = (chosen or {}).get("r", "") or next((re.search(r"/(\d+\.\d+)(?:-arm64|-x86_64)?/", v[1]).group(1)
+                                                     for v in rlibs.values() if re.search(r"/(\d+\.\d+)(?:-arm64|-x86_64)?/", v[1])), "")
+    software = {"python": (chosen or {}).get("python", ""), "r": r_version,
+                "stata_version_in_code": sorted({v for v, _ in ev["stata_version"]}),
+                "stata_installations": installs}
+    github_r = {p_: rlibs[p_][2]["remote"] for p_ in needs["r"] if p_ in rlibs and rlibs[p_][2]["remote"]}
+    downloads_pkgs = {m: DOWNLOADS_AT_IMPORT[m] for m in list(needs["python"]) + list(needs["r"]) if m in DOWNLOADS_AT_IMPORT}
 
     res = {"evidence": {k: v for k, v in ev.items()}, "needs": {k: dict(v) for k, v in needs.items()},
            "conda_envs": ranked, "stata_plus": str(plus) if plus else "", "stata_installed": trk,
-           "r_libraries_found": len(rlibs)}
+           "stata_package_versions": trk_info, "software": software, "r_github": github_r,
+           "downloads_at_import": downloads_pkgs, "r_libraries_found": len(rlibs)}
     L = ["# Environments", "", "## Evidence in the project", ""]
     for n, w in ev["env_names"]:
         L.append(f"- env `{n}` — {w}")
@@ -364,14 +491,35 @@ def main():
     for lang in ("python", "r", "stata", "julia"):
         if needs.get(lang):
             L.append(f"- **{lang}** ({len(needs[lang])}): " + ", ".join(sorted(needs[lang])))
+    L += ["", "## Software versions to record (replication-info.json → software; confirm with the user)", ""]
+    L.append(f"- Python {software['python'] or '—'}; R {software['r'] or '—'}")
+    if needs.get("stata") or ev["stata_version"]:
+        L.append(f"- Stata `version` statements in the code: {', '.join(software['stata_version_in_code']) or 'none'} "
+                 "— ask which Stata version and flavor produced the paper's numbers")
+        for i in installs:
+            L.append(f"- Stata installation: `{i['path']}` {', '.join(i['flavors'])}" + (" (pystata found)" if i["pystata"] else ""))
     if needs.get("stata"):
         L += ["", f"## Stata packages installed (`{plus or 'PLUS folder not found — pass --stata-ado'}`)", ""]
         for p_ in sorted(needs["stata"]):
-            L.append(f"- {p_}: " + (f"installed from {trk[p_]}" if p_ in trk else "**not found in stata.trk** (built-in, vendored .ado, or check)"))
+            ver = trk_info.get(p_, {})
+            vtxt = f" — {ver.get('version', '')} installed {ver.get('installed', '')}".rstrip() if ver else ""
+            L.append(f"- {p_}: " + (f"installed from {trk[p_]}{vtxt}" if p_ in trk else "**not found in stata.trk** (built-in, vendored .ado, or check)"))
     if needs.get("r"):
         L += ["", "## R packages (installed versions found)", ""]
         for p_ in sorted(needs["r"]):
-            L.append(f"- {p_}: {rlibs[p_][0] + ' (' + rlibs[p_][1] + ')' if p_ in rlibs else 'not found in user R libraries'}")
+            if p_ in rlibs:
+                v, lib, info = rlibs[p_]
+                L.append(f"- {p_}: {v} ({lib})" + (f" — GitHub `{info['remote']}`" if info["remote"] else ""))
+            else:
+                L.append(f"- {p_}: not found in the R libraries searched (pass --r-lib)")
+    if downloads_pkgs or ev["downloads"]:
+        L += ["", "## Runtime downloads (fail on offline compute nodes; vendor the data or document a first run online)", ""]
+        for m, what in sorted(downloads_pkgs.items()):
+            L.append(f"- package `{m}` downloads {what} on first use")
+        for f, hit in ev["downloads"][:40]:
+            L.append(f"- `{f}`: `{hit}`")
+        if len(ev["downloads"]) > 40:
+            L.append(f"- … {len(ev['downloads']) - 40} more")
     text = "\n".join(L) + "\n"
     if a.report:
         assert_writable(a.report, roots)
@@ -384,37 +532,35 @@ def main():
 
     if a.write_r and needs.get("r"):
         assert_writable(a.write_r, roots)
-        chosen = ranked[0] if ranked else None
-        in_env = set(chosen["r_have"]) if chosen else set()
-        todo = sorted(set(needs["r"]) - in_env)
-        if not todo:
-            lines = ["# All R packages used by the code are provided by the conda environment (environment.yml).",
-                     "# Nothing to install here."]
-        else:
-            lines = ["# R packages used by the code that are not provided by the conda environment.",
-                     "# Generated by detect_envs.py from the authors' installed versions; run inside the env:",
-                     "#   mamba run -n <env> Rscript environment.R", "library(renv)", "renv::init(bare = TRUE)"]
-            for p_ in todo:
-                v = rlibs.get(p_, ("", ""))[0]
-                lines.append(f'renv::install("{p_}@{v}")' if v else f'renv::install("{p_}")')
-            lines += ['renv::settings$snapshot.type("all")', "renv::snapshot()"]
+        ryml = Path(a.write_r).with_name("environment-R.yml")
+        provided = yml_r_packages(ryml) if ryml.exists() else set()
+        lines, n = write_environment_r(a.write_r, needs["r"], rlibs, provided, r_version)
         Path(a.write_r).write_text("\n".join(lines) + "\n")
-        print(f"✅ wrote {a.write_r} ({len(todo)} package(s) via renv; {len(in_env)} already in the conda env)")
+        print(f"✅ wrote {a.write_r} ({n} package(s); {len(provided & set(needs['r']))} provided by "
+              f"{ryml.name if ryml.exists() else 'no environment-R.yml found next to it'})")
     if a.write_stata and needs.get("stata"):
         assert_writable(a.write_stata, roots)
+        sv = ", ".join(software["stata_version_in_code"]) or "unknown"
         lines = ["* Installs the user-written Stata packages used by this replication package.",
-                 "* Generated by detect_envs.py from the authors' installation (stata.trk). Run once in Stata.", ""]
+                 "* Generated by detect_envs.py from the authors' installation (stata.trk). Run once in Stata.",
+                 f"* Stata version used by the authors: {sv} (from `version` statements; confirm). Results and runtimes",
+                 "* can differ with another Stata version or with newer package versions (SSC installs the current one).", ""]
         local = set(ev.get("local_ado", []))
         for p_ in sorted(needs["stata"]):
             if p_ in local:
                 lines.append(f"* {p_}: shipped with the package (.ado in progs/) — not installed here")
                 continue
             src = trk.get(p_, "")
+            ver = trk_info.get(p_, {})
+            note = f"   // authors had: {ver.get('version', '?')}, installed {ver.get('installed', '?')}" if ver else \
+                   "   // authors' version unknown"
             if "repec/bocode" in src.lower() or not src:
-                lines.append(f"capture noisily ssc install {p_}, replace")
+                lines.append(f"capture noisily ssc install {p_}, replace{note}")
             else:
-                lines.append(f'capture noisily net install {p_}, from("{src}") replace')
-        lines += ["", "* Alternative: restore the authors' full package list", "* net install adolist, from(http://fmwww.bc.edu/RePEc/bocode/a)",
+                lines.append(f'capture noisily net install {p_}, from("{src}") replace{note}')
+        lines += ["", "* If a package changed its estimator since the authors' version, vendor the authors' version",
+                  "* into progs/Stata/ (copied below) or use the command's version option (e.g. reghdfe ..., version(5)).",
+                  "* Alternative: restore the authors' full package list", "* net install adolist, from(http://fmwww.bc.edu/RePEc/bocode/a)",
                   "* adolist install <slug>.pkl", "", "* Version-sensitive packages vendored in progs/Stata/ (if any) are copied here:",
                   "* shell cp -f ./progs/Stata/<package-version>/* ./progs/Stata/"]
         Path(a.write_stata).write_text("\n".join(lines) + "\n")

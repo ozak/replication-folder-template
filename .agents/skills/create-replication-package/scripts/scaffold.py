@@ -13,9 +13,10 @@ a path uses a local clone. Template-development files (.git, .claude/, .agents/,
 *.code-workspace, the repo README) are never copied.
 
 Then it:
-  * removes components the paper does not use (--no-r: environment.R, progs/R;
+  * removes components the paper does not use (--no-r: environment-R.yml, environment.R, progs/R;
     --no-stata: setup.do, progs/Stata) and the Stata placeholder notebook;
-  * sets the environment name (environment.yml `name:`, create_env.sh ENV_NAME) to --slug;
+  * sets the environment names (environment.yml / create_env.sh ENV_NAME = --slug; environment-R.yml /
+    R_ENV_NAME = <slug>-r);
   * creates the standard folders (raw-data, data, scratch_data, html, graphs|tables/paper|appendix,
     _migration);
   * copies the confirmed paper/author information (--info, see project_info.py) to
@@ -81,7 +82,8 @@ def main():
     if readme.exists() and (t / "replication-package" / "README.md").exists():
         readme.unlink()
     for rel in ["replication-package/progs/Stata/Stata-Notebook.ipynb"] + \
-               (["replication-package/environment.R", "replication-package/progs/R"] if a.no_r else []) + \
+               (["replication-package/environment.R", "replication-package/environment-R.yml",
+                 "replication-package/progs/R"] if a.no_r else []) + \
                (["replication-package/setup.do", "replication-package/progs/Stata"] if a.no_stata else []):
         p = t / rel
         if p.is_dir():
@@ -94,9 +96,14 @@ def main():
     env = t / "replication-package" / "environment.yml"
     if env.exists():
         env.write_text(re.sub(r"^name:.*$", f"name: {a.slug}", env.read_text(), count=1, flags=re.M))
+    renv_yml = t / "replication-package" / "environment-R.yml"
+    if renv_yml.exists():
+        renv_yml.write_text(re.sub(r"^name:.*$", f"name: {a.slug}-r", renv_yml.read_text(), count=1, flags=re.M))
     sh = t / "replication-package" / "create_env.sh"
     if sh.exists():
-        sh.write_text(re.sub(r'ENV_NAME="[^"]*"', f'ENV_NAME="{a.slug}"', sh.read_text(), count=1))
+        txt = re.sub(r'^ENV_NAME="[^"]*"', f'ENV_NAME="{a.slug}"', sh.read_text(), count=1, flags=re.M)
+        txt = re.sub(r'^R_ENV_NAME="[^"]*"', f'R_ENV_NAME="{a.slug}-r"', txt, count=1, flags=re.M)
+        sh.write_text(txt)
     if tmp:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"✅ created {t} from {'bundled template' if src == BUNDLED else src}")

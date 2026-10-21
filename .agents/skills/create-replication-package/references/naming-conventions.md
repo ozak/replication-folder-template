@@ -67,13 +67,14 @@ Figure-B1-a3  Figure-B1-b3  Figure-B1-c3
 |---|---|
 | `replication-package/graphs/paper/`, `tables/paper/` | numbered (main-text) figures and tables |
 | `replication-package/graphs/appendix/`, `tables/appendix/` | lettered (appendix) figures and tables |
-| `1-paper/graphs/…`, `1-paper/tables/…` | copies of what the main `.tex` references |
-| `2-appendix/graphs/…`, `2-appendix/tables/…` | copies of what the appendix `.tex` references |
+| `1-paper/graphs/`, `1-paper/tables/` | flat copies of exactly what the main `.tex` uses |
+| `2-appendix/graphs/`, `2-appendix/tables/` | flat copies of exactly what the appendix `.tex` uses |
 
-The path written in the `.tex` (`./graphs/paper/Figure-1-a`, `./tables/appendix/Table-D3`) is the
-same relative path inside `replication-package/`, `1-paper/` and `2-appendix/`. `Copy-Final.ipynb`
-reads the `.tex` files and copies exactly what they reference, so appendix items that appear in the
-main text (e.g. an EJ "Appendix A" inside the main paper) are handled automatically.
+The `.tex` files reference the flat folder next to them (`./graphs/Figure-1-a`, `./tables/Table-D3`);
+names are unique across paper and appendix, so no subfolder is needed. `Copy-Final.ipynb` reads both
+`.tex` files, finds each referenced file in `replication-package/graphs|tables/(paper|appendix)/` and
+copies it next to the document that uses it — appendix items used in the main text (e.g. an EJ
+"Appendix A" inside the paper) are handled automatically.
 
 ## What a table file contains
 

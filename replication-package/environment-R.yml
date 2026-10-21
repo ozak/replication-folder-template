@@ -1,0 +1,23 @@
+name: awesome-project-r
+# R environment, separate from the Python environment. R packages available on conda-forge that the
+# authors installed from conda are listed here (pinned); the rest are installed by environment.R.
+channels:
+  - conda-forge
+dependencies:
+  - r-base=4.3
+  - r-irkernel
+  - r-remotes
+  # system libraries R packages compile against (never pinned)
+  - cairo
+  - freetype
+  - fontconfig
+  - fribidi
+  - harfbuzz
+  - pkg-config
+  - make
+  - compilers
+  # spatial packages (sf, terra, ...): uncomment
+  # - gdal
+  # - proj
+  # - geos
+  # - udunits2

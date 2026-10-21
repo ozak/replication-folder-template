@@ -9,14 +9,16 @@ Usage:
 Checks (❌ = must fix, ⚠️ = review):
   1. template placeholders left (XXX, TITLE, AWESOME, {{token}}, PASTE HERE ...)
   2. template artifacts left (CLAUDE.md, *.code-workspace, Stata-Notebook.ipynb, placeholder .tex)
-  3. every \\includegraphics / \\input in 1-paper/ and 2-appendix/ resolves; final outputs live
-     under graphs|tables/(paper|appendix)/ and also exist in replication-package/ (Copy-Final source)
+  3. every \\includegraphics / \\input / \\inputbody in 1-paper/ and 2-appendix/ resolves to the flat
+     graphs/ or tables/ folder next to the .tex, and the file exists in
+     replication-package/graphs|tables/(paper|appendix)/ (Copy-Final source)
   4. final file names follow the convention (paper/ = numbers only, appendix/ = letter+number)
   5. every notebook in progs/ is run by index.ipynb, and index.ipynb runs nothing missing
   6. Stata notebooks: %%stata cells need `import stata_init` first and a python3 kernel
   7. absolute paths / cd in code
   8. README.md has the Data Editors sections; replication-zip.ipynb has exclusion rules
-  9. environment.yml name == create_env.sh ENV_NAME; files > 2 GB
+  9. environments: names match create_env.sh; no r-* packages in environment.yml; no pinned system
+     libraries; environment-R.yml when R is used; _migration/env-check.md (check_env.py) passed; files > 2 GB
  10. no spaces in any folder or file name of the package (spaces become "-")
 """
 import json
@@ -91,7 +93,7 @@ def main():
         for t in texs:
             txt = re.sub(r"(?<!\\)%[^\n]*", "", t.read_text(encoding="utf-8", errors="replace"))
             refs = [("g", m) for m in re.findall(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}", txt)] + \
-                   [("t", m) for m in re.findall(r"\\input\s*\{([^}]+)\}", txt)]
+                   [("t", m) for m in re.findall(r"\\input(?:body)?\s*\{([^}]+)\}", txt)]
             n_ok = 0
             for kind, ref in refs:
                 ref = ref.strip()
@@ -104,12 +106,14 @@ def main():
                     continue
                 n_ok += 1
                 rel = os.path.relpath(hits[0], D)
-                if not re.match(r"(graphs|tables)/(paper|appendix)/", rel):
-                    report("⚠️", f"{doc_dir}/{t.name}: {ref} is not under graphs|tables/(paper|appendix)/")
-                elif not (P / rel).exists():
-                    report("⚠️", f"{rel} used by {doc_dir} but not in replication-package/{rel} (Copy-Final copies from there)")
+                if not re.match(r"(graphs|tables)/[^/]+$", rel):
+                    report("⚠️", f"{doc_dir}/{t.name}: {ref} is not in the flat graphs/ or tables/ folder next to the .tex")
+                else:
+                    folder, name = rel.split("/")
+                    if not any((P / folder / loc / name).exists() for loc in ("paper", "appendix")):
+                        report("⚠️", f"{doc_dir}/{rel} not in replication-package/{folder}/(paper|appendix)/ (Copy-Final copies from there)")
             report("✅", f"{doc_dir}/{t.name}: {n_ok} figure/table references resolve")
-    for sub in ["graphs/paper", "graphs/appendix", "tables/paper", "tables/appendix"]:
+    for sub in ["graphs/paper", "graphs/appendix", "tables/paper", "tables/appendix"]:  # package keeps paper/appendix
         d = P / sub
         if not d.is_dir():
             continue
@@ -179,12 +183,34 @@ def main():
         report("❌", "replication-zip.ipynb missing")
 
     # 9. env + sizes
-    env, sh = P / "environment.yml", P / "create_env.sh"
-    if env.exists() and sh.exists():
-        n1 = re.search(r"^name:\s*(\S+)", env.read_text(), re.M)
-        n2 = re.search(r'ENV_NAME="?([^"\s]+)', sh.read_text())
-        if n1 and n2 and n1.group(1) != n2.group(1):
-            report("❌", f"environment.yml name '{n1.group(1)}' != create_env.sh ENV_NAME '{n2.group(1)}'")
+    env, renv, sh = P / "environment.yml", P / "environment-R.yml", P / "create_env.sh"
+    sh_txt = sh.read_text() if sh.exists() else ""
+    for f, var in ((env, "ENV_NAME"), (renv, "R_ENV_NAME")):
+        if f.exists() and sh_txt:
+            n1 = re.search(r"^name:\s*(\S+)", f.read_text(), re.M)
+            n2 = re.search(rf'^{var}="?([^"\s]+)', sh_txt, re.M)
+            if n1 and n2 and n1.group(1) != n2.group(1):
+                report("❌", f"{f.name} name '{n1.group(1)}' != create_env.sh {var} '{n2.group(1)}'")
+    sys_pin = re.compile(r"^\s*-\s*((?:lib\w*|openssl|curl|icu|zlib|openjdk|ca-certificates|tzdata|blas|mkl|openblas)[\w.-]*)=", re.M)
+    for f in (env, renv):
+        if f.exists():
+            txt = f.read_text()
+            pins = sys_pin.findall(txt)
+            if pins:
+                report("⚠️", f"{f.name}: system libraries pinned ({', '.join(pins[:6])}) — unpin them so the env resolves on every platform")
+            if re.search(r"=\w+_\w+\s*$|=[\w.]+=[hp][0-9a-f]{6,}", txt, re.M):
+                report("⚠️", f"{f.name}: build strings present — remove them (platform-specific)")
+    if env.exists() and re.search(r"^\s*-\s*r-", env.read_text(), re.M):
+        report("❌", "environment.yml contains r-* packages — R goes in environment-R.yml (separate env)")
+    uses_r = progs.is_dir() and any(p.suffix.lower() in (".r", ".rmd") or (p.suffix == ".ipynb" and '"ir"' in p.read_text(errors="replace"))
+                                    for p in progs.rglob("*") if p.is_file())
+    if uses_r and not renv.exists():
+        report("❌", "R code in progs/ but no environment-R.yml")
+    chk = T / "_migration" / "env-check.md"
+    if not chk.exists():
+        report("⚠️", "no _migration/env-check.md — run check_env.py on the environment files (linux-64 + osx-arm64)")
+    elif "❌" in chk.read_text():
+        report("❌", "_migration/env-check.md reports environments that do not resolve")
     for dp, dns, fns in os.walk(P):
         for f in fns:
             fp = Path(dp) / f

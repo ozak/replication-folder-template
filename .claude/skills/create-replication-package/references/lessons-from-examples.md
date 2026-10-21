@@ -1,7 +1,7 @@
-# Lessons from two real conversions
+# Lessons from real conversions
 
-Read this when planning a migration. Both packages were built by hand from messy folders; the
-skill now automates what they had to discover.
+Read this when planning a migration. The first two packages were built by hand from messy folders;
+the third was built with the skill. The skill now automates what they had to discover.
 
 ## Case 1 — CountryStability → MS20230792-replication (EJ 2025)
 
@@ -35,6 +35,24 @@ skill now automates what they had to discover.
 | Python 3.11 broke legacy packages (`collections.Mapping`) | `create_env.sh` writes a `sitecustomize.py` compatibility shim; local package installed with `pip install -e ./raw-data/WALS/cldfbench-wals` |
 | An RA's earlier half-finished package inside the source (`MS20240011-replication/` with `paper_tables.do`, `problems in replication.docx`) | Read it for hints; never overwrite it |
 | Unused notebooks kept in `progs/*/unused/` | Better: do not migrate them; if the user insists, keep `unused/` and exclude it in replication-zip |
+
+## Case 3 — MS15875 "Millet, Rice, and Isolation" (Oct 2026)
+
+Built with this skill; Python + R + Stata, run on a cluster with a 4-seat Stata licence. The general
+rules it led to are in `environments.md`, `reproducibility.md`, `cluster.md`, `backup.md`; the
+concrete problems are in `known-issues.md`.
+
+| Source situation | What the package did / what the skill does now |
+|---|---|
+| Authors' working env with 106 packages (Gurobi, graph-tool, Earth Engine, OpenJDK); hours to solve, failed on Linux | Minimal env from the imports, result-computing packages pinned, system libraries free; full env kept in `_migration/`; `check_env.py` solves linux-64 and osx-arm64 before shipping |
+| R packages inside the Python env pulled a second R | Separate R env + kernel with `PROJ_DATA`/`GDAL_DATA` |
+| R figures depended on ggplot2 ≤3.4, dplyr 1.1, a GitHub fork | Pinned core packages installed last and checked; fork at a fixed commit |
+| Stata/MP with 4 network seats; 11-hour `margins` notebooks; Stata 19 4× slower than 18 | `run_notebooks.py`: Stata seat limit, retry when Stata cannot start, slow steps first, dependencies; authors' Stata version recorded |
+| Kriging fit varied between runs | Run-twice check; threads limited; authors chose how to treat the paper's draw |
+| TikZ figures and hand-written tables shifted the numbering | Numbers from the compiled `.aux` |
+| Errors found in the original (Figure E3 loop, Tables I1–I4 identical, Figure 4-b stale) | Consistency checks in Phases 2 and 8; reported, fixed only with the authors' consent |
+| Code produced far more than the paper used (≈390 estimations, ≈120 used) | Optional clean-up phase, verified by identical used outputs |
+| DVC cache in Google Drive lost PDF versions | Caches outside synced drives (`backup.md`) |
 
 ## Recurring problems to expect
 

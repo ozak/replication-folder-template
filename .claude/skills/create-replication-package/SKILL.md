@@ -31,14 +31,17 @@ and access to any licensed data — reproduces every number, table and figure by
 > ask the same three questions again in plain text (numbered, with the defaults shown), and
 > accept short free-form answers such as "current folder, MS12345, Google Drive".
 
-After Phase 0, read `references/lessons-from-examples.md` (what two real conversions needed).
-Read when you reach the phase: `references/naming-conventions.md` (Phase 2),
-`references/template-structure.md` (Phase 3), `references/index-patterns.md` (Phase 6),
-`references/readme-guide.md` (Phase 7).
+After Phase 0, read `references/lessons-from-examples.md` (what real conversions needed) and skim
+`references/known-issues.md` (symptom → cause → fix; check it whenever something fails).
+Read when you reach the phase: `references/environments.md` (Phases 1 and 3),
+`references/naming-conventions.md` (Phase 2), `references/template-structure.md` (Phase 3),
+`references/index-patterns.md` and `references/cluster.md` (Phase 6), `references/readme-guide.md`
+(Phase 7), `references/reproducibility.md` (Phase 8), `references/backup.md` (when the user versions
+the package with Git/DVC or asks about backups).
 
 ## Two ways the skill is used
 
-* **Convert an existing project** (most requests): follow Phases 0–8 below.
+* **Convert an existing project** (most requests): follow Phases 0–8 below (Phase 9, clean-up, is optional).
 * **Start a new project with the template** ("set up a new paper folder", "start a project with the
   replication template"): ask where the project folder should go, its name/slug, the working
   title and the **co-authors' names**; fill each author's affiliation, e-mail, website and ORCID
@@ -50,7 +53,8 @@ Read when you reach the phase: `references/naming-conventions.md` (Phase 2),
 
 ## Ground rules
 
-1. **The source folders are read-only — absolutely.** Never edit, move, rename, delete or create
+1. **The source folders are read-only — absolutely** (for you and for every subagent or worker you
+   start). Never edit, move, rename, delete or create
    anything in them (or in earlier replication attempts inside them): no output files, no notebooks
    executed in place, no `git` commands, no `__pycache__` (run Python with `-B` or
    `PYTHONDONTWRITEBYTECODE=1`). Never run the original code inside the source — it writes outputs;
@@ -76,7 +80,8 @@ Read when you reach the phase: `references/naming-conventions.md` (Phase 2),
 5. **Stop at the ★ checkpoints** and get the user's confirmation; batch questions with the
    AskUserQuestion tool where available.
 6. **Ask before installing anything** (pip/conda/brew/Stata packages), even in a sandbox.
-7. Keep working files in `<target>/_migration/` (inventory, rename map, lineage, plan, log).
+7. Keep working files in `<target>/_migration/` (inventory, rename map, lineage, plan, log). They
+   document the migration and are not part of the zipped package.
 8. **No spaces in names.** Every folder and file created for the package — the shared folder, the
    target, notebooks, data, outputs — replaces whitespace with `-` (runs collapse to one):
    `The Millennia of China` → `The-Millennia-of-China-shared/`, `clean data.do` →
@@ -84,7 +89,18 @@ Read when you reach the phase: `references/naming-conventions.md` (Phase 2),
    The originals keep their names (read-only); record each rename in the rename map and update
    every reference to it (code paths, `.tex`, `index.ipynb`). Existing path components outside the
    package (e.g. `My Drive`) stay as they are. `check_package.py` fails on any name with spaces.
-   They document the migration and are not part of the zipped package.
+9. **Ask before any decision that can change results or the paper** — fixing an error found in the
+   original code, choosing between estimation options, hard-coding parameters, restyling figures,
+   changing a table's content. Present the options with their effect on the printed numbers; the
+   authors decide (★). Record the decision in `migration-log.md`.
+10. **Explain every difference concretely:** which numbers or figures, how large, and why (or that the
+    cause is still unknown) — with evidence (`compare_tables.py`, a file-by-file comparison, a pixel
+    difference for figures).
+11. **No long local reruns once the code is final.** Fix the code, verify with the fast notebooks,
+    and leave hour-long steps for the full run on the reference machine or server. Ask before
+    running anything heavy.
+12. **Delete reversibly, and only in the package.** Move what is removed to
+    `_migration/removed/<date>/` first; keep `raw-data/` until the data steps have been rebuilt.
 
 | Script | Phase | Purpose |
 |---|---|---|
@@ -96,14 +112,18 @@ Read when you reach the phase: `references/naming-conventions.md` (Phase 2),
 | `project_info.py` | 1, 3 | paper title + **all authors** (affiliation, email, ORCID, website) extracted from the final `.tex`, completed by web search, confirmed by the user; stored in `<target>/replication-info.json` |
 | `scaffold.py` | 3 | create the package from the template bundled in `assets/template/` (no clone needed) |
 | `apply_defaults.py` | 3 | fill the template tokens (title, authors, citation, compute specs) from `replication-info.json` (called by `scaffold.py`) |
-| `detect_envs.py` | 1, 3 | which conda/mamba env (and R, Stata, Julia setup) the project used: evidence in the code + envs on the machine ranked by how many imports they provide; writes `environment.R` and `setup.do` from the authors' installed packages |
-| `export_env.py` | 3 | portable `environment.yml` from the chosen env (by name, or by reading the env folder directly) |
+| `detect_envs.py` | 1, 3 | which conda/mamba env (and R, Stata, Julia setup) the project used: evidence in the code + envs on the machine ranked by how many imports they provide; software versions to record, GitHub-installed packages, runtime downloads; writes `environment.R` (authors' versions, core packages last, checked) and `setup.do` |
+| `export_env.py` | 3 | **minimal** `environment.yml` from the chosen env (only what the code imports, pinned by role, no R), the separate `environment-R.yml`, and the full env as a record in `_migration/` |
+| `check_env.py` | 3, 8 | dry-run solve of each environment file for linux-64 and osx-arm64 (nothing installed); names the pins that conflict |
 | `convert_to_notebook.py` | 4 | `.py/.ipy/.do/.R` → notebook (Stata = pystata) |
 | `audit_paths.py` | 4 | find / rewrite absolute paths, `cd`, old relative layouts |
 | `build_renaming_notebook.py` | 5 | `rename_map.json` → `progs/Python/Renaming.ipynb` |
-| `rewrite_tex_paths.py` | 5 | copy of the .tex pointing to `graphs|tables/(paper|appendix)/…`; pasted table bodies → `\input` (head/foot kept) |
+| `rewrite_tex_paths.py` | 5 | copy of the .tex pointing to the flat `./graphs/…`, `./tables/…` next to it; pasted table bodies → `\input` (head/foot kept) |
 | `compare_tables.py` | 5, 8 | every number printed in the paper's tables vs. the regenerated bodies; suggests `replace`/`drop_rows` |
-| `check_package.py` | 8 | static verification of the finished package |
+| `check_package.py` | 8 | static verification of the finished package (incl. environment files) |
+
+The template also ships `progs/Python/run_notebooks.py`, the runner `index.ipynb` uses (Phase 6), with
+tests in `SKILL_DIR/tests/test_runner.py`.
 
 ---
 
@@ -155,6 +175,8 @@ whether to use it or create the hyphenated one.
    target (never overwrite; ask for another name). The shared folder may contain the target but
    everything else in it is read-only. In Cowork, request access to exactly these folders with
    `device_request_folder_access`, never more.
+   If the target is in a synced drive (it usually is) and the package will be versioned with
+   Git/DVC, environments and DVC caches must stay outside it (`references/backup.md`).
 4. Start **every** shell call with the printed line:
    `export REPLICATION_READONLY="<originals>:<shared>" REPLICATION_TARGET="<target>" PYTHONDONTWRITEBYTECODE=1`
    — all bundled scripts refuse to write anywhere read-only except inside the target.
@@ -214,7 +236,10 @@ whether to use it or create the hyphenated one.
    R packages, Stata user-written commands, Julia packages). Then **ask the user** (one batch):
    *"Was a mamba/conda environment used for this project? Best match: `<name>` (python X, N/M imports)
    — use it / another one / none"*; and, when the code uses them: which R (the env's R, a system R,
-   renv), which Stata (flavor/location; its PLUS folder for installed packages), Julia project, etc.
+   renv), which Stata (**version** and flavor — the report lists `version` statements in the code and
+   the installations it sees; a different version can change results and runtime; its PLUS folder for
+   installed packages), Julia project, commercial solvers, etc. Record the answers (and the OS of the
+   machine that produced the paper's numbers) in `replication-info.json` → `software`.
    If the environments are not visible (e.g. a VM that only mounts the project), ask where the
    user's environments live and request read access to **that one environment folder** (read-only;
    add it to `REPLICATION_READONLY`). If no environment was used, the package's `environment.yml`
@@ -243,6 +268,10 @@ whether to use it or create the hyphenated one.
    Review every non-`ok` status: `missing` (file not found — ask), `inline` (table pasted into the
    .tex), `unresolved`, `duplicate`. Check panel letters, overview images, grids and appendix
    letters against the compiled PDF (rules: `references/naming-conventions.md`).
+   **Check every number against what LaTeX printed**, not against counted `\includegraphics`: TikZ
+   figures, hand-written tables, `\addtocounter` and subfigure captions shift the count. Use the
+   final `.aux` (`\newlabel{fig:x}{{3}{…}}`, `\@writefile{lof}{…\numberline {3}…}`) — if there is
+   none, compile a copy of the .tex in a scratch folder — and match each float by its label/caption.
 2. Inline tables — match their numbers against generated files:
    ```bash
    python3 SKILL_DIR/scripts/match_inline_tables.py --project-root "<source>" \
@@ -257,15 +286,27 @@ whether to use it or create the hyphenated one.
        --rename-map _migration/rename_map.json --exclude <unrelated subfolders> \
        --output _migration/lineage.json --report _migration/lineage.md
    ```
-   Read `lineage.md` critically: pick one producer when variants tie (`X.ipynb`, `X-old`, `X-CAN`),
+   Read `lineage.md` critically. Generated-vs-input classification is error-prone: writes inside
+   commented-out code (`/* … */`, `*`/`//`/`#` lines, `if (FALSE)` blocks) are not writes; paths built
+   with R `paste()/paste0()/file.path()`, Python variables/f-strings or Stata macros must be resolved by
+   reading the code; broad patterns (`` `f'.xlsx ``) only match within their folder. Pick one producer when variants tie (`X.ipynb`, `X-old`, `X-CAN`),
    resolve *ambiguous inputs* (file written by many scripts), *unresolved outputs*, raw inputs
    **NOT FOUND** (external drives, co-author machines, downloads) and *dynamic paths*. Open the
    candidate scripts to confirm — the trace is a heuristic, your reading is the check.
-4. Write `_migration/plan.md`:
+4. **Check the original for errors** while reading the producers, and list findings in
+   `_migration/possible-errors.md` (never fix them silently — ground rule 9):
+   * loops whose body reads or writes a fixed file name instead of using the loop variable (all panels
+     of a figure from one file);
+   * specifications that should differ but use the same parameter (caption says radius 10, code
+     uses 5) — later confirmed when two tables come out identical (Phase 8);
+   * figures or tables in the paper older than the data or code that should have produced them.
+5. Write `_migration/plan.md`:
    * **Steps table** grouped in Parts (I. basic data → analysis blocks → rename/copy): step title ·
      source script(s) → new notebook name (Title-Case-Hyphenated, by purpose: `Clean-Merge-Data`,
      `Secession-Conflict-Regressions`) · language · inputs · outputs · figures/tables produced ·
-     runtime class (normal / slow → guarded / cluster).
+     runtime class (normal / slow → guarded / cluster) · **after** (the steps whose outputs it reads;
+     these become the runner's `after=[...]`) · nondeterminism (random draws, multithreaded fits,
+     clustering, kriging, bootstrap → run-twice check in Phase 8).
    * **Raw data table**: `raw-data/<Source>` folder (one per provider) · files · citation/URL ·
      licence · ship publicly? Licensed data also blocks **derived** files at fine granularity
      (lineage tells you which) — they go to the confidential zip.
@@ -296,26 +337,44 @@ The user never clones the template or edits configuration files — the skill do
    template from GitHub instead.) Move the Phase 1–2 working files into `<target>/_migration/`.
    For a conversion also delete the placeholder `1-paper/main.tex` and `2-appendix/appendix.tex`
    (replaced in Phase 5).
-3. **Environment files from the environments the authors used** (never invented):
+3. **Environment files from the environments the authors used** (never invented; rules in
+   `references/environments.md`). Ship the *minimal* environment — what the migrated code loads —
+   not the authors' working env; keep the full one as a record:
    ```bash
-   # Python (+ conda R packages): from the chosen env — by name, or by reading its folder directly
-   python3 -B SKILL_DIR/scripts/export_env.py -n <env>            -o "<target>/replication-package/environment.yml" --slug <paper-slug>
-   python3 -B SKILL_DIR/scripts/export_env.py --prefix <env-folder> -o "<target>/replication-package/environment.yml" --slug <paper-slug> \
-       [--add-missing <pkg> ...]     # imports the code needs that the env lacks (from detect_envs), flagged for the user
-   # R packages not in the conda env, pinned to the installed versions; Stata packages from their install sources
-   python3 -B SKILL_DIR/scripts/detect_envs.py --project-root "<source>" --lineage "<target>/_migration/lineage.json" --env <env> \
-       --write-r "<target>/replication-package/environment.R" --write-stata "<target>/replication-package/setup.do"
+   P="<target>/replication-package"; M="<target>/_migration"
+   # 1. what the migrated code needs (only the scripts on the paper's path)
+   python3 -B SKILL_DIR/scripts/detect_envs.py --project-root "<source>" --lineage "$M/lineage.json" --env <env> \
+       --json "$M/envs.json" --report "$M/envs.md"
+   # 2. Python env (minimal, pinned by role, no r-*) + separate R env + full record
+   python3 -B SKILL_DIR/scripts/export_env.py --prefix <env-folder> --needs "$M/envs.json" --slug <paper-slug> \
+       -o "$P/environment.yml" [--r-out "$P/environment-R.yml"] [--stata] [--add-missing <pkg> ...]
+   python3 -B SKILL_DIR/scripts/export_env.py --prefix <env-folder> --full -o "$M/environment-full.yml"
+   # 3. R packages environment-R.yml does not provide (authors' versions, core packages last) + Stata packages
+   python3 -B SKILL_DIR/scripts/detect_envs.py --project-root "<source>" --lineage "$M/lineage.json" --env <env> \
+       --write-r "$P/environment.R" --write-stata "$P/setup.do"
+   # 4. resolves on Linux and macOS? (dry run, nothing installed, ~1 min per file and platform)
+   python3 -B SKILL_DIR/scripts/check_env.py "$P/environment.yml" ["$P/environment-R.yml"] --report "$M/env-check.md"
    ```
-   The export keeps only the packages the authors explicitly installed (plus top-level pip
-   packages), pinned to the installed versions without build strings, so it is portable. Report
-   imports the env does not provide (unused imports, or packages installed another way) and ask before
-   adding them. Stata: when the PLUS folder is readable, `setup.do` installs each user-written package
-   from the exact source it came from; otherwise (or additionally) run `adolist save <slug>.pkl` in the
-   user's Stata and use `adolist install`; **vendor version-sensitive packages** the results depend on
-   (e.g. an old `reghdfe`) into `progs/Stata/` with a copy step in `setup.do`. Julia: copy
-   `Project.toml`/`Manifest.toml`. Put any extra install steps in `create_env.sh` (local
-   `pip install -e`, compatibility shims, kernels). The template's environment files are only a
-   fallback when nothing was detected.
+   (`-n <env>` instead of `--prefix` when conda is on PATH.) Report imports the env does not provide
+   (local modules, unused imports, or packages installed another way) and ask before adding them. If
+   `check_env.py` fails, relax system-library and minor pins first; never relax a pin of a package that
+   computes results without asking. If the authors used no conda env, build `environment.yml` from
+   the detected imports with current versions and tell the user it was reconstructed.
+   * **R**: its own environment (`environment-R.yml`, kernel `ir`); `environment.R` installs from the
+     CRAN archive or GitHub at the recorded commit, core packages (ggplot2, dplyr, …) **after** their
+     extensions, and stops if any version differs. Spatial R packages need `gdal proj geos udunits2`
+     in the R env (commented in the template).
+   * **Stata**: when the PLUS folder is readable, `setup.do` installs each user-written package from
+     the exact source it came from and notes the authors' version; otherwise (or additionally) run
+     `adolist save <slug>.pkl` in the user's Stata and use `adolist install`. **Vendor
+     version-sensitive packages** the results depend on (an old `reghdfe`) into `progs/Stata/` with a
+     copy step in `setup.do`, or use the command's version option.
+   * **Runtime downloads** listed by `detect_envs.py` (packages that fetch data at first import, URLs
+     in the code): vendor the data into `raw-data/` with citation and access date, or add a
+     "first run needs internet" step to `create_env.sh` and the README.
+   * Julia: copy `Project.toml`/`Manifest.toml`. Other extra steps (local `pip install -e`,
+     compatibility shims) go in the extra-steps block of `create_env.sh`; machine-specific lines
+     (cluster modules, paths) only in its EDIT HERE block.
 4. Create the paper-specific folders from the plan: `raw-data/<Source>/`, `data/<Step>/`, output
    subfolders.
 
@@ -338,6 +397,10 @@ README and zip.
   `%%stata`. Review the cell split and add markdown that says what each section produces.
 * Keep as scripts (copy next to the notebooks): cluster/batch scripts (`.sh`, `.sbatch`), scripts
   run with arguments (`python x.py {i}`), `.do` files called on a cluster, helper modules, `.ado`.
+* **Steps that take hours** (estimation + margins + plots in one notebook): offer the authors to
+  split computation from presentation — the compute notebook saves its estimates to `data/<Step>/`,
+  a separate notebook draws the figures/tables from them — so a styling fix never needs the long
+  rerun. Only with their consent (it departs from rule 3); log it.
 * Consolidate only if the user asked for it (OriginLanguages: 97 .do files → three
   `*-Main-Tables-Figures` notebooks with `# Table N` headings). Otherwise keep one notebook per
   original script, same code, same order.
@@ -355,7 +418,9 @@ Repeat until the report is clean (or every remaining hit is justified in the log
 **Outputs.** Strategy A: make the code write into the same relative folders as in the source
 (`graphs/Jupyter/…` stays `graphs/Jupyter/…` inside the package) so `rename_map.json` sources stay
 valid. Strategy B: edit each `savefig` / `graph export` / `esttab using` to write
-`../../graphs/paper/Figure-1-a.pdf`, `../../tables/appendix/Table-D3.tex`, … directly.
+`../../graphs/paper/Figure-1-a.pdf`, `../../tables/appendix/Table-D3.tex`, … directly. Make output
+order deterministic while editing (sorted column lists instead of `set`/dict order) only when it does
+not change values; otherwise ask.
 
 ## Phase 5 — Names and LaTeX
 
@@ -366,7 +431,7 @@ valid. Strategy B: edit each `savefig` / `graph export` / `esttab using` to writ
    ```
    Same for the appendix (`2-appendix/<ID>-appendix-<YYYYMMDD>.tex`). For every table whose body was
    pasted, the rows between the header `\midrule` and `\bottomrule` become
-   `\input{./tables/<paper|appendix>/Table-N}`; head and foot stay verbatim, and the removed rows are
+   `\input{./tables/Table-N}`; head and foot stay verbatim, and the removed rows are
    saved to `_migration/original_bodies/Table-N.tex` (the reference for `compare_tables.py`).
    Tables it lists for manual work: multi-panel tables (keep each panel's header rows in the .tex and
    `\input` `Table-N-Panel-A`, `-B` bodies), tables without booktabs rules, tables inside `\input`'ed
@@ -374,18 +439,22 @@ valid. Strategy B: edit each `savefig` / `graph export` / `esttab using` to writ
    Tables the paper `\input`s or `\include`s as **complete files** (their own `tabular` head/foot,
    often edited by hand so they look right — `"table_file": "full"` in the rename map) are treated the
    same way: the file is inlined into the new .tex with its head and foot verbatim, its body rows become
-   `\input{./tables/<loc>/Table-N}`, and the original rows go to `_migration/original_bodies/`.
+   `\input{./tables/Table-N}`, and the original rows go to `_migration/original_bodies/`.
    (`--keep-table-files` disables this.) Files that already contain only body rows keep their `\input`.
    If paper and appendix are one file, run it once per output and cut at `\appendix`; the appendix
    keeps the preamble, starts with `\appendix` and `\counterwithin{figure}{section}` /
    `\counterwithin{table}{section}`. Copy `.bib`, `.sty`, `.bst`, `.cls` the documents need.
+   Paths in the new .tex point to the **flat** `./graphs/` and `./tables/` next to it (the package
+   itself keeps `graphs|tables/(paper|appendix)/`).
 2. Build the renaming notebook (both strategies; rows already final are skipped):
    ```bash
    python3 SKILL_DIR/scripts/build_renaming_notebook.py --rename-map _migration/rename_map.json \
        --out "<target>/replication-package/progs/Python/Renaming.ipynb" [--path-map '[["old/","new/"]]']
    ```
-   Pasted tables and complete table files get `extract_body(src, dst, replace=[], drop_rows=[])`:
-   only the body rows of the code's output are kept. For complete files, `match_inline_tables.py`
+   Pasted tables and complete table files get `extract_body(src, dst, replace=[], drop_rows=[], order=[])`:
+   only the body rows of the code's output are kept; `drop_rows` also drops the standard-error line
+   under a dropped row, `order` reorders rows as the paper prints them, `replace` pairs are raw strings
+   (`r"\textit"`, never `"\t…"`), and file names must match in upper/lower case. For complete files, `match_inline_tables.py`
    (Phase 2) looks for the code output the edited file came from (`generator`); if none is found the
    referenced file itself is assumed to be the code's output — confirm with `lineage.md`. Finish every
    `TODO` (unverified sources).
@@ -400,31 +469,46 @@ valid. Strategy B: edit each `savefig` / `graph export` / `esttab using` to writ
    `replace` pairs (labels edited in the paper) into the table's `extract_body` call and rerun until
    all tables pass. A ❌ on numbers is never fixed by editing numbers: find the cause (wrong script
    variant, older data vintage, sample, seed, wrong matched source) and tell the user.
-4. `progs/Python/Copy-Final.ipynb` (template) needs no edits: it reads both .tex files and copies
-   every referenced `graphs|tables/(paper|appendix)/…` file from `replication-package/`.
-5. If LaTeX is installed, compile both documents and compare with the original PDF (page count,
-   figure/table numbering).
+4. `progs/Python/Copy-Final.ipynb` (template) needs no edits: it reads both .tex files, finds every
+   referenced `graphs/…`/`tables/…` file in `replication-package/graphs|tables/(paper|appendix)/` and
+   copies it into the flat folder next to the document that uses it.
+5. **Compile and check after every rewrite** (if LaTeX is installed): page count, every figure and
+   table number and caption against the original PDF. When paper and appendix cross-reference each
+   other (xr/xr-hyper), compile them one after the other (paper, appendix, paper) — never in parallel —
+   and never delete `.aux` files. LaTeX errors after the rewrite are usually known
+   (`references/known-issues.md` → LaTeX: `\input` bodies breaking `\bottomrule`, `\subref`, babel
+   captions); apply the listed fix only when that error appears, and tell the user.
 
 ## Phase 6 — index.ipynb
 
 Follow `references/index-patterns.md`. Replace every template placeholder cell with the steps of
 `plan.md`, in dependency order:
 * title cell (title, authors); Stata cell with the detected `STATA_location`/`version` (remove it
-  if no Stata); directory-structure cell listing all folders;
-* one blue header + description (inputs, outputs, figures/tables) + run cell per notebook, using the
-  template's `!cd ./progs/<Lang>/ && jupyter nbconvert … --execute … && … --to html` pattern
-  (`kernel_name=python3` for Python and pystata notebooks, `ir` for R);
-* slow steps: red header, runtime estimate, `should_I_run = False`, cluster and local options,
-  one-iteration timing, and a green **test** that recomputes a slice and compares it with the
-  shipped data;
-* last part: `Renaming` then `Copy-Final`.
+  if no Stata); the runner cell (`PARALLEL`, `MAX_PARALLEL`, `LIMITS`); directory-structure cell
+  listing all folders;
+* one blue header + description (inputs, outputs, figures/tables) + one run cell per notebook:
+  `runner.step("progs/<Lang>/<Name>.ipynb", after=[<steps whose outputs it reads>])`. The runner
+  (template `progs/Python/run_notebooks.py`) runs each notebook in its folder, saves it and its HTML
+  even when it fails, limits Stata notebooks to the licence seats, retries a notebook whose first
+  cell fails (Stata could not start), and skips steps whose inputs failed;
+* slow steps: red header, runtime estimate and machine, `should_I_run = False`, cluster and local
+  options, one-iteration timing, and a green **test** that recomputes a slice and compares it with the
+  shipped data (guarded steps are not listed in other steps' `after`);
+* last part: `Renaming` then `Copy-Final`, then the summary cell `runner.run_all()`.
+
+When any step is slow or needs a cluster, add the cluster instructions (`references/cluster.md`):
+how to find Stata and test pystata on the node, a submission script (one node, long walltime, no
+notebook timeout, submitted from `replication-package/`, `PARALLEL = True`).
 
 ## Phase 7 — README and zips
 
 1. Fill `replication-package/README.md` section by section (`references/readme-guide.md`): data
-   sources table (one row per `raw-data/` folder), software (env, Stata packages incl. vendored
-   versions, R), runtime/memory/storage, programs table mirroring index.ipynb with links to outputs,
-   instructions, references. Remove template text that does not apply.
+   sources table (one row per `raw-data/` folder), software (exact versions of Python, R, Stata and
+   other tools from `replication-info.json`; the environments; Stata packages incl. vendored
+   versions; first-run downloads), runtime/memory/storage, programs table mirroring index.ipynb with
+   links to outputs, instructions (incl. the troubleshooting notes of `create_env.sh` and the cluster
+   run if relevant), platform-sensitive steps (`references/reproducibility.md` §4), references.
+   Remove template text that does not apply.
 2. `replication-zip.ipynb`: add one exclusion cell per licensed source **and its derived files**
    (from lineage), e.g.
    ```python
@@ -438,24 +522,58 @@ Follow `references/index-patterns.md`. Replace every template placeholder cell w
 ## Phase 8 — Verify
 
 1. `python3 SKILL_DIR/scripts/check_package.py "<target>"` — fix until **0 errors**; review warnings.
-2. Ask before executing anything heavy. With the user's environment, run the fast notebooks (or all
-   of `index.ipynb`), rerun `compare_tables.py` (must be all ✅) and compare figures with the
-   originals visually. Record results in `migration-log.md`.
-3. Report to the user: what was built, what was verified, and what still needs them — notebooks not
-   executed, licensed data to obtain, numbers in the text to locate, Zenodo upload, journal checklist.
+2. **Environment**: `check_env.py` must pass (linux-64 and osx-arm64). Then, with the user's
+   agreement (it installs), build the shipped environments once (`bash create_env.sh`), run the
+   fast notebooks with them, and compare their outputs file by file with those from the authors'
+   env. Differences are reported concretely (ground rule 10) and traced (version pins,
+   `references/known-issues.md`).
+3. **Results**: run the fast notebooks (or all of `index.ipynb` when the user agrees; long steps go to
+   the server — ground rule 11), rerun `compare_tables.py` (must be all ✅) and compare figures with
+   the paper's (pixel difference where possible, otherwise side by side).
+4. **Reproducibility** (`references/reproducibility.md`): run each step flagged as nondeterministic
+   twice in scratch copies and compare. If outputs vary, the paper's numbers are one draw: present the
+   options (fix the variation and update the paper / hard-code the paper's values / document the
+   variation) ★. Flag platform-sensitive steps for the final run.
+5. **Consistency**: tables that should differ but are identical (same N, R² and coefficients — e.g.
+   two radii giving the same numbers), figures in the paper that differ from their regenerated
+   version, and the items in `_migration/possible-errors.md`. Report each with its evidence; fixes
+   only with the authors' consent ★.
+6. Record everything in `migration-log.md`. Report to the user: what was built, what was verified,
+   and what still needs them — notebooks not executed, the full run on the server, licensed data to
+   obtain, numbers in the text to locate, decisions pending, Zenodo upload, journal checklist.
+7. **Offer the optional clean-up (Phase 9)** in one question; skip it unless the user says yes.
+
+## Phase 9 — Clean-up (optional, only if the user says yes)
+
+Remove what the paper does not use, without changing any used output.
+1. From the rename map and lineage, list the outputs that are **used** (by the .tex files or by a
+   later step) → `_migration/cleanup-used.json`, and write the rules in `_migration/cleanup-spec.md`
+   (what may be removed, what must stay identical). With several languages, one worker per language
+   follows the same spec; all workers respect ground rule 1.
+2. Classify files: `generated-files.txt` (written by the code — see the classification traps in
+   Phase 2) and `input-files-keep.txt` (read and never written). Check that every reader of a
+   generated file runs after its writer in `index.ipynb`.
+3. Propose, and apply only after the user agrees: removing code blocks whose outputs nothing uses,
+   trimming loop lists to the values read downstream (match reads and writes at the level of the
+   loop variables), rewriting notebook headers to say what each notebook now does. Log each change.
+4. Write `clean_outputs.py` (dry run by default; removes generated files, keeps folders because the
+   code does not create them) for a clean-room run. Deleting follows ground rule 12.
+5. Rerun the affected notebooks and show that every used output is identical to before.
 
 ## Completion checklist
 
 - [ ] Source folders untouched; `_migration/` holds inventory, rename map, lineage, plan, log
 - [ ] Only traced code migrated; every paper figure/table has a producer
 - [ ] Template artifacts removed; no placeholders (`check_package.py` clean)
-- [ ] `environment.yml` from the real env; `create_env.sh` ENV_NAME matches; `setup.do` + `.pkl` (+ vendored packages)
+- [ ] Minimal `environment.yml` (pinned by role, no `r-*`) + `environment-R.yml`/`environment.R` if R, from the authors' envs; full env in `_migration/`; `check_env.py` passes on linux-64 and osx-arm64
+- [ ] `create_env.sh` names match; `setup.do` (+ `.pkl`, vendored packages); software versions recorded
 - [ ] All paths relative to `progs/<Lang>/`; `audit_paths.py` clean
 - [ ] No spaces in any folder or file name (spaces → `-`); references updated
 - [ ] Stata notebooks: pystata (`import stata_init`, `%%stata`)
 - [ ] `Renaming.ipynb` complete (no TODO); names follow the convention; `Copy-Final.ipynb` runs
 - [ ] Table heads/feet come from the final paper; bodies from the code; `compare_tables.py` all ✅
-- [ ] `1-paper/` and `2-appendix/` .tex reference `graphs|tables/(paper|appendix)/…` and compile
-- [ ] `index.ipynb` runs every step in order; slow steps guarded with tests
+- [ ] `1-paper/` and `2-appendix/` .tex reference the flat `graphs/`, `tables/` next to them, compile, and print the original numbers
+- [ ] `index.ipynb` runs every step with the runner (`after=[...]` filled); slow steps guarded with tests
+- [ ] Nondeterministic steps run twice; possible errors in the original reported; decisions logged
 - [ ] README complete (data sources, software, runtime, programs table, instructions)
 - [ ] `replication-zip.ipynb` excludes licensed data and its derivatives; user confirmed

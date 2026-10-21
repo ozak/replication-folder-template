@@ -34,20 +34,48 @@ import shutil
 
 PKG = "../../"   # notebook runs from progs/Python/
 
+def _exact_case(path):
+    """True if every component of path exists with exactly this case (macOS/Windows ignore case, Linux does not)."""
+    parts, cur = os.path.normpath(path).split(os.sep), ""
+    for p in parts:
+        if p in ("", ".", ".."):
+            cur = os.path.join(cur, p) if cur or p else os.sep
+            continue
+        if p not in os.listdir(cur or "."):
+            return False
+        cur = os.path.join(cur, p)
+    return True
+
 def copy_output(src, dst):
     """Copy an analysis output (relative to replication-package/) to its final name."""
     s, d = os.path.join(PKG, src), os.path.join(PKG, dst)
     if not os.path.exists(s):
         raise FileNotFoundError(f"{s} not found — run the notebook that produces it first")
+    if not _exact_case(s):
+        raise FileNotFoundError(f"{s} exists only with a different upper/lower case — fix the name (Linux is case-sensitive)")
     os.makedirs(os.path.dirname(d), exist_ok=True)
     shutil.copyfile(s, d)
     print(f"{src}  ->  {dst}")
 
-def wrap_table(src, dst, pre="", post="", body_between=None, replace=None, drop_rows=None):
-    """Write dst = pre + body + post.
+def _rows(lines):
+    """Group body lines into rows: a labelled line plus the unlabelled lines under it (standard errors, CIs)."""
+    rows = []
+    for ln in lines:
+        label = ln.split("&")[0].strip()
+        if rows and not label and "&" in ln:
+            rows[-1].append(ln)
+        else:
+            rows.append([ln])
+    return rows
+
+def wrap_table(src, dst, pre="", post="", body_between=None, replace=None, drop_rows=None, order=None, with_se=True):
+    r"""Write dst = pre + body + post.
     body_between=(start_marker, end_marker) keeps only the lines strictly between the markers
     (e.g. (r"\midrule", r"\bottomrule") to keep the coefficient rows of an esttab file).
-    replace: optional list of (old, new) string replacements applied to the body."""
+    replace: (old, new) string pairs applied to the body (write patterns as raw strings: r"\textit").
+    drop_rows: labels of rows to drop; with_se=True also drops the unlabelled line(s) under each
+    (standard errors). order: labels in the order the paper prints them (rows not listed keep their
+    place after the listed ones)."""
     s, d = os.path.join(PKG, src), os.path.join(PKG, dst)
     with open(s, encoding="utf-8") as fh:
         body = fh.read()
@@ -62,8 +90,13 @@ def wrap_table(src, dst, pre="", post="", body_between=None, replace=None, drop_
             if ln.strip().startswith(a) and not keep:
                 keep = True
         body = "\n".join(out)
-    if drop_rows:   # drop rows (lines) whose label starts with any of these strings
-        body = "\n".join(ln for ln in body.splitlines() if not any(ln.strip().startswith(d) for d in drop_rows))
+    rows = _rows(body.splitlines()) if with_se else [[ln] for ln in body.splitlines()]
+    if drop_rows:
+        rows = [r for r in rows if not any(r[0].strip().startswith(x) for x in drop_rows)]
+    if order:
+        key = lambda r: next((i for i, x in enumerate(order) if r[0].strip().startswith(x)), len(order))  # noqa: E731
+        rows = sorted(rows, key=key)
+    body = "\n".join(ln for r in rows for ln in r)
     for old, new in (replace or []):
         body = body.replace(old, new)
     os.makedirs(os.path.dirname(d), exist_ok=True)
@@ -71,13 +104,13 @@ def wrap_table(src, dst, pre="", post="", body_between=None, replace=None, drop_
         fh.write(pre + body + post)
     print(f"{src}  ->  {dst} (wrapped)")
 
-def extract_body(src, dst, replace=None, drop_rows=None, start=r"\midrule", end=r"\bottomrule"):
-    """Keep only the table BODY (rows between the header rule and the bottom rule).
+def extract_body(src, dst, replace=None, drop_rows=None, order=None, with_se=True, start=r"\midrule", end=r"\bottomrule"):
+    r"""Keep only the table BODY (rows between the header rule and the bottom rule).
     The paper keeps its own head (caption, column headers) and foot (notes) and \\input's this file,
     so numbers come from the code and presentation from the final paper.
     replace: (generated, final) pairs for row labels edited in the paper; drop_rows: labels of rows
     the paper omits (both suggested by compare_tables.py)."""
-    wrap_table(src, dst, body_between=(start, end), replace=replace, drop_rows=drop_rows)
+    wrap_table(src, dst, body_between=(start, end), replace=replace, drop_rows=drop_rows, order=order, with_se=with_se)
 '''
 
 

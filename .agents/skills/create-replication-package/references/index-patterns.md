@@ -36,19 +36,31 @@ and which figures/tables) and link the notebook: ``run jupyter notebook [`./prog
 Typical part structure: I. basic data (raw → clean) · II–N. analysis blocks (calibration,
 counterfactuals, regressions, maps…) · last: rename, clean and copy tables and figures.
 
-## Run a notebook (Python, or Stata via pystata)
+Steps that take hours: when the authors agree, split them into a compute notebook that saves its
+estimates (coefficients, margins, predictions) to `data/<Step>/` and a separate plotting/table
+notebook that reads them, so restyling a figure never needs the long rerun (Stata: also keep the
+`.gph` files; `graph use` + `gr_edit` restyles without recomputing).
+
+## Run a notebook (Python, Stata via pystata, R)
+
+The template's runner cell (after the Stata setup) creates `runner`; every step is one cell:
 
 ```python
 %%time
-notebook_name = 'WALS'
-!cd ./progs/Python/ && jupyter nbconvert "{notebook_name}.ipynb" --to notebook --ExecutePreprocessor.kernel_name=python3 --execute --output "{notebook_name}.ipynb" && jupyter nbconvert "{notebook_name}.ipynb" --to html --output "../../html/{notebook_name}.html" 
-url = f"./html/{notebook_name}.html"
-IFrame(url, width=800, height=400)
+runner.step("progs/Python/WALS.ipynb")
 ```
-For a Stata notebook change only the folder (`./progs/Stata/`); the kernel stays `python3`.
-For R: `./progs/R/` and `--ExecutePreprocessor.kernel_name=ir`.
-Add `--ExecutePreprocessor.timeout=-1` for long notebooks. Put `from IPython.display import IFrame`
-in a cell before the first run cell.
+```python
+%%time
+runner.step("progs/Stata/Main-Tables-Figures.ipynb", after=["Clean-Merge-Data"])
+```
+* `after=[...]`: the steps whose outputs this notebook reads (from `lineage.md`). Always fill it —
+  it is what makes parallel mode safe and what skips a step whose inputs failed.
+* Kernel: chosen from the notebook (`ir` for R, `python3` otherwise, including pystata).
+* Other limited resources: `uses={"gurobi": 1}` and `LIMITS = {"gurobi": 1}` in the runner cell.
+* Long or cluster runs: set `PARALLEL = True` in the runner cell; the step cells then only register,
+  and the last cell `runner.run_all()` runs everything (see `cluster.md`).
+* The last cell (`runner.run_all()`) prints the summary table in both modes; keep it.
+* Do not go back to `!jupyter nbconvert …` cells: they lose the notebook when it fails.
 
 ## Run a .do file that stays a script
 
@@ -82,6 +94,8 @@ if should_I_run:
 ```
 State the estimated runtime and the machine it was measured on. Ship the outputs of the
 expensive step in `data/` so later steps run without it.
+A guarded notebook is `if should_I_run: runner.step("progs/…/X.ipynb")`. Because its outputs are
+shipped, later steps do **not** list it in `after=[...]` (a step that was not run counts as missing).
 
 ## Test (green): recompute a slice and compare with the shipped data
 

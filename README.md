@@ -56,11 +56,12 @@ replication-folder-template/
 ├── replication-package/      # Self-contained, submittable replication package
 │   ├── index.ipynb           # Master notebook — runs the full analysis
 │   ├── README.md             # Social Science Data Editors README template
-│   ├── environment.yml       # Conda/Mamba environment (Python 3.11 + base R)
-│   ├── environment.R         # Additional R packages via renv
-│   ├── create_env.sh         # One-step environment creation script
+│   ├── environment.yml       # Minimal Python environment (what the code imports; no R)
+│   ├── environment-R.yml     # Separate R environment (only if R is used)
+│   ├── environment.R         # R packages at the authors' versions, checked
+│   ├── create_env.sh         # Creates the environments and kernels (unattended; EDIT HERE block)
 │   ├── setup.do              # Stata package installer
-│   ├── progs/Python/         # Python notebooks (incl. Renaming.ipynb, Copy-Final.ipynb)
+│   ├── progs/Python/         # Python notebooks (incl. Renaming.ipynb, Copy-Final.ipynb) + run_notebooks.py (runner)
 │   ├── progs/Stata/          # Stata notebooks (pystata: python3 kernel + %%stata)
 │   └── progs/R/              # R notebooks (IRkernel)
 ├── replication-zip.ipynb     # Creates distributable zips for journal submission
@@ -94,7 +95,7 @@ This creates a Mamba/Conda environment with Python 3.11, Jupyter, pystata suppor
 - Python notebooks in `replication-package/progs/Python/`, Stata in `progs/Stata/` (pystata notebooks: first cell `import stata_init`, then `%%stata` cells), R in `progs/R/`
 - Raw/input data in `replication-package/raw-data/<Source>/` (one folder per provider); data created by code in `data/<Step>/`
 - All paths relative to the notebook's folder: `../../raw-data/...`, `../../data/...`
-- LaTeX in `1-paper/` and `2-appendix/`; final figures/tables in `graphs|tables/(paper|appendix)/`, named `Figure-1-a`, `Table-D3`, … (see the naming rules in `.claude/skills/create-replication-package/references/naming-conventions.md`)
+- LaTeX in `1-paper/` and `2-appendix/`; final figures/tables in `replication-package/graphs|tables/(paper|appendix)/`, copied into flat `graphs/` and `tables/` folders next to each `.tex`, named `Figure-1-a`, `Table-D3`, … (see the naming rules in `.claude/skills/create-replication-package/references/naming-conventions.md`)
 - In the paper, keep each table's caption, column headers and notes in the `.tex` and `\input` only the body produced by the code
 
 ### Step 4 — Orchestrate from `index.ipynb`
@@ -156,12 +157,13 @@ You can choose "next to the original" or any other path. The skill refuses desti
 | **0 — Locations** | The three questions above; validates the destination | — |
 | **1 — Discover** | Surveys the project (and extra sources): candidate `.tex` versions, code by language, data sizes, absolute paths, earlier replication attempts, online-only cloud files (downloaded automatically). Extracts title and **all authors** from the final `.tex` and completes missing affiliations, e-mails, ORCIDs and websites by web search. Detects the **software environment** used: kernelspecs and `mamba activate` lines in the code, environment/requirements/renv files, and the environments on your machine ranked by how many of the code's imports they provide | Final `.tex`; **the author list and details**; **which mamba/conda environment (and R/Stata/Julia setup) was used**; journal, licensed data, slow/cluster steps |
 | **2 — Map & trace** | Names every figure and table as LaTeX prints them; finds the files behind tables pasted into the `.tex`; traces each output back to the code and raw data that produce it, so only what the paper needs is migrated | Rename map and migration plan |
-| **3 — Scaffold** | Creates the package from the template bundled with the skill, stores the confirmed paper/author info in `replication-info.json` and fills the README, notebooks and paper templates from it. Builds `environment.yml` **from the environment you used** (explicitly installed packages, pinned), `environment.R` for R packages outside the env (pinned to your installed versions), and `setup.do` installing each Stata package from the source you installed it from (packages shipped as `.ado` in the project are kept instead) | Packages the code imports but your environment lacks; computer used |
+| **3 — Scaffold** | Creates the package from the template bundled with the skill, stores the confirmed paper/author info in `replication-info.json` and fills the README, notebooks and paper templates from it. Builds a **minimal** `environment.yml` **from the environment you used** (only what the code imports; result-computing packages pinned exactly, system libraries left free), a separate R environment with `environment.R` (your installed versions, core packages last, checked), and `setup.do` installing each Stata package from the source you installed it from; checks that the environments resolve on Linux and macOS without installing anything | Packages the code imports but your environment lacks; computer used |
 | **4 — Migrate** | Copies raw data into `raw-data/<Source>/`; converts each script to a notebook (same code, same order; Stata via pystata); makes every path relative | — |
 | **5 — Names & LaTeX** | Writes `1-paper/` and `2-appendix/` `.tex` files pointing at the standardized outputs; builds `Renaming.ipynb`; compares tables | Any table whose numbers differ |
-| **6 — index.ipynb** | One step per notebook in dependency order; slow steps guarded, with cluster/local options and tests against shipped data | — |
+| **6 — index.ipynb** | One step per notebook in dependency order, run by `run_notebooks.py` (saves failed notebooks, Stata licence limit, retries when Stata cannot start, dependencies, optional parallel mode); slow steps guarded, with cluster/local options and tests against shipped data | — |
 | **7 — README & zips** | Fills the Data Editors README; sets zip exclusions for licensed data *and the files derived from it* | Exclusion list |
-| **8 — Verify** | Static package check, table comparison, optional execution of notebooks | Final report |
+| **8 — Verify** | Static package check, environment check, table comparison, run-twice checks for nondeterministic steps, consistency checks for errors in the original | Final report; decisions that change results |
+| **9 — Clean-up** (optional) | Removes code and loop iterations that produce nothing used; verifies used outputs are identical | What to remove |
 
 ### Principles it follows
 
@@ -257,13 +259,17 @@ From `replication-package/index.ipynb`:
    mamba activate <env-name>
    jupyter lab
    ```
-4. Open `index.ipynb`, restart the kernel, run all cells. Each step executes a notebook and shows its HTML output.
+4. Open `index.ipynb`, restart the kernel, run all cells. Each step executes a notebook with the runner and shows its HTML output (set `PARALLEL = True` in the runner cell to run independent notebooks at once).
 
 **Run a single notebook (Python or Stata/pystata):**
 ```bash
 cd replication-package/progs/Python      # or progs/Stata
 jupyter nbconvert "Analysis.ipynb" --to notebook \
   --ExecutePreprocessor.kernel_name=python3 --execute --output "Analysis.ipynb"
+```
+or, with the runner (saves the notebook and its HTML even when it fails), from `replication-package/`:
+```bash
+python progs/Python/run_notebooks.py progs/Python/A.ipynb progs/Stata/B.ipynb:after=A --parallel 2
 ```
 
 ---

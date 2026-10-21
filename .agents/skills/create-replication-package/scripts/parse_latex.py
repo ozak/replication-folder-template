@@ -192,10 +192,11 @@ class Parser:
             has_ext = Path(lp).suffix.lower() in GRAPHIC_EXTS
             exts = [Path(s).suffix for s in e.get("sources", [])] or ([Path(lp).suffix] if has_ext else [])
             e["dest"] = sorted({f"{folder}/{loc}/{e['name']}{x}" for x in exts})
-            e["latex_new_path"] = f"{folder}/{loc}/{e['name']}" + (Path(lp).suffix if has_ext else "")
+            # flat folders next to each .tex: 1-paper/graphs/Figure-1-a.pdf (package keeps graphs/<loc>/)
+            e["latex_new_path"] = f"{folder}/{e['name']}" + (Path(lp).suffix if has_ext else "")
         else:
             e["dest"] = [f"{folder}/{loc}/{e['name']}.tex"]
-            e["latex_new_path"] = f"{folder}/{loc}/{e['name']}" + (".tex" if lp.endswith(".tex") else "")
+            e["latex_new_path"] = f"{folder}/{e['name']}" + (".tex" if lp.endswith(".tex") else "")
             if e.get("sources") and e["status"] in ("ok",):
                 # Is the referenced file a complete (often hand-edited) table — with its own tabular
                 # head/foot — or only body rows? Complete files get split: head/foot move into the

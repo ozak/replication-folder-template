@@ -1,72 +1,21 @@
 name: awesome-project
+# Placeholder. The skill replaces this file with the minimal environment built from the authors'
+# environment (export_env.py): only packages the code imports; result-computing packages pinned
+# exactly, others to minor versions; system libraries never listed; no R packages (see environment-R.yml).
 channels:
   - conda-forge
-  - defaults
-  - r
 dependencies:
   - python=3.11
   - pip
-  - geopandas
-  - pandas
-  - pandas-datareader
-  - statsmodels
-  - xlrd
-  - dask
-  - networkx
-  - ipykernel
-  - ipyparallel
-  - ipython
-  - ipython_genutils
-  - ipywidgets
-  - kiwisolver
-  - matplotlib
-  - scikit-image
-  - scikit-learn
-  - scipy
-  - seaborn
-  - geoplot
-  - geopy
-  - pycountry
-  - nb_conda_kernels
-  - nbconvert
-  - stata_kernel
-  - plotly
-  - nodejs
-  - geocoder
-  - html5lib
-  - plotnine
-  - ipympl
-  - git
-  - python-kaleido
-  - numba
-  - jupyter
   - jupyterlab
-  - jupyter_contrib_nbextensions
+  - ipykernel
+  - nbclient
+  - nbconvert
+  - threadpoolctl
   - numpy
-  - openpyxl
-  - jinja2
-  - r
-  - r-base
-  - r-dplyr
-  - r-tidyverse
-  - r-essentials
-  - r-easypackages
-  - r-binsreg
-  - r-data.table
-  - r-renv
-  - r-ggplot2
-  - r-remotes
-  - rpy2
+  - pandas
+  - scipy
+  - statsmodels
+  - matplotlib
   - pip:
-      - geonamescache
-      - stargazer
-      - ipystata
-      - pyfixest
-      - isounidecode
-      - binsreg
-      - rdrobust 
-      - lets-plot
-      - jupyterlab_stata_highlight3
-      - dask-labextension
-      - hmi
-      - stata_setup==0.1.3
+    - stata_setup

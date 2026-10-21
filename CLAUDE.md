@@ -14,8 +14,9 @@ replication-folder-template/
 ├── 2-appendix/           # LaTeX appendix source
 ├── replication-package/  # Self-contained replication package
 │   ├── index.ipynb       # Master orchestration notebook — runs everything
-│   ├── environment.yml   # Conda/Mamba environment (Python 3.11 + base R packages)
-│   ├── environment.R     # Additional R packages installed via renv
+│   ├── environment.yml   # Minimal Python environment (no R)
+│   ├── environment-R.yml # Separate R environment (only if R is used)
+│   ├── environment.R     # R packages at the authors' versions
 │   ├── create_env.sh     # One-step environment creation script
 │   ├── setup.do          # Stata package installer (run once in Stata)
 │   ├── progs/Python/     # Python Jupyter notebooks
@@ -25,33 +26,16 @@ replication-folder-template/
 
 ## Environment Setup
 
-**Recommended (Mamba):**
 ```bash
 cd replication-package
 bash create_env.sh
 ```
 
-`create_env.sh` handles platform differences automatically: on macOS it installs `libblas=*=*accelerate` (Apple Silicon optimization) and brew packages (`fribidi`, `automake`, `autoconf`); on Linux it runs `module load conda/stata` and `apt-get install libfribidi-dev`.
+`create_env.sh` runs unattended (mamba > micromamba > conda, no sudo). Machine-specific lines (cluster `module load`, `USE_ACCELERATE` on macOS) live in its EDIT HERE block. It creates:
+- the **Python env** from `environment.yml` — minimal: only what the code imports, result-computing packages pinned exactly, system libraries unpinned, **no `r-*` packages**; registers a Python kernel;
+- the **R env** from `environment-R.yml` (only if present) — `r-base`, `r-irkernel`, R packages from conda-forge, system libraries R packages compile against; then runs `environment.R` (CRAN-archive/GitHub installs at the authors' versions, core packages last, version checks) and registers the `ir` kernel with `PROJ_DATA`/`GDAL_DATA` from the R env.
 
-**Manual (Conda):**
-```bash
-mamba env create -n Awesome-Project -f replication-package/environment.yml
-mamba activate Awesome-Project
-python -m stata_kernel.install   # finish Stata kernel setup
-R -e "IRkernel::installspec()"   # register R kernel
-```
-
-**R packages** — `environment.yml` installs base R and a set of `r-*` conda packages. `environment.R` then runs inside that conda environment to set up renv and install additional R packages:
-```bash
-mamba run -n Awesome-Project R -f replication-package/environment.R
-```
-This calls `renv::init(bare=TRUE)`, installs packages via `renv::install()`, and snapshots the environment with `renv::snapshot()`. The result is a hybrid: conda manages Python and base R; renv manages the additional R package layer.
-
-**Stata packages** (run once from within Stata):
-```stata
-do replication-package/setup.do
-```
-`setup.do` uses the `adolist` package to restore a saved package list from a `.pkl` file. When adapting for a new paper, regenerate the `.pkl` by running `adolist save <name>.pkl` from a configured Stata installation, then update the `adolist install` line in `setup.do`.
+**Stata packages** (run once from within Stata): `do replication-package/setup.do`. It installs each user-written package from its source (authors' versions noted); `adolist install <name>.pkl` is the alternative. Stata runs through **pystata** (`stata_setup` in the Python env).
 
 ## Running the Analysis
 
@@ -62,7 +46,7 @@ All steps are orchestrated from `replication-package/index.ipynb`. Before runnin
 3. Launch JupyterLab: `jupyter lab`
 4. Open `index.ipynb`, restart kernel, and run all cells.
 
-`index.ipynb` executes child notebooks via shell calls to `jupyter nbconvert` and simultaneously converts them to HTML, displaying each as an inline IFrame. Cells guarded by `should_I_run = False` are skipped by default — set to `True` to enable expensive or conditional steps.
+`index.ipynb` runs each child notebook with `progs/Python/run_notebooks.py` (`runner.step("progs/Python/X.ipynb", after=[...])`): in the notebook's folder, no timeout, saved and exported to `html/` even when it fails, Stata notebooks limited to the licence seats, notebooks whose first cell fails (Stata could not start) retried, dependents of failed steps skipped. `PARALLEL = True` in the runner cell runs independent notebooks at once (longest first). Cells guarded by `should_I_run = False` are skipped by default — set to `True` to enable expensive or conditional steps.
 
 **Execute a single Python notebook from the command line:**
 ```bash
@@ -111,7 +95,7 @@ Run `replication-zip.ipynb` from the repo root. It:
 | `replication-package/README.md` | Paper title, authors, data sources table, step-by-step table |
 | `replication-package/index.ipynb` | `STATA_location`, `version`, notebook names per step |
 | `replication-package/environment.yml` | `name:` field and pinned dependency versions |
-| `replication-package/environment.R` | `renv::install()` calls for paper-specific R packages |
-| `replication-package/create_env.sh` | `ENV_NAME` variable |
+| `replication-package/environment-R.yml`, `environment.R` | R env and R packages (written by the skill from the authors' R) |
+| `replication-package/create_env.sh` | EDIT HERE block (`ENV_NAME`, `R_ENV_NAME`, cluster modules) |
 | `replication-package/setup.do` | `adolist install <name>.pkl` (regenerate `.pkl` from your Stata env) |
 | `replication-zip.ipynb` | `df_files.loc[...]` rows to exclude confidential datasets |
